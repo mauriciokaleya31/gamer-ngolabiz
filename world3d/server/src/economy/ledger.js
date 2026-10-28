@@ -20,6 +20,7 @@ export const DEMO_GRANT_KZ = 10000;
 export const ALLOWED_STAKES_KZ = [0, 500, 1000, 2000, 5000];
 
 const FAUCET = 'sys:faucet_demo';
+const SHOP = 'sys:shop_demo';
 const PLATFORM = 'sys:platform_fees_demo';
 
 export class LedgerError extends Error {
@@ -45,6 +46,15 @@ export class DemoLedger {
     this.feePct = feePct;
     this.ensureAccount(FAUCET, null, 'faucet');
     this.ensureAccount(PLATFORM, null, 'platform');
+    this.ensureAccount(SHOP, null, 'shop');
+  }
+
+  /** Compra de um item do catálogo com saldo DEMO (idempotente por jogador+item). */
+  purchase(playerId, itemId, priceKz) {
+    if (!Number.isFinite(priceKz) || priceKz < 0) throw new LedgerError('preço inválido', 'bad_price');
+    const cents = kzToCents(priceKz);
+    if (cents === 0) return { txnId: null, duplicate: false };
+    return this.post({ type: 'purchase', ref: itemId, idempotencyKey: `buy:${playerId}:${itemId}`, memo: `Compra (demo): ${itemId}`, entries: [{ account: this.playerAccount(playerId), amount: -cents }, { account: SHOP, amount: cents }] });
   }
 
   ensureAccount(id, owner, kind) {

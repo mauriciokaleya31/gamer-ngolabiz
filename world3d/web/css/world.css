@@ -151,3 +151,76 @@ button { font-family: inherit; cursor: pointer; }
   #chat { width: calc(100vw - 180px); bottom: 16px; }
   .clock { font-size: 26px; }
 }
+
+/* ---------------- Emotes e emojis ---------------- */
+#expr { left: 50%; bottom: 90px; transform: translateX(-50%); width: min(620px, calc(100vw - 24px)); max-height: 60vh; overflow-y: auto; z-index: 6; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.chips button { background: rgba(255,255,255,.06); color: var(--text); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 13px; }
+.chips button.active { background: var(--accent); border-color: var(--accent); }
+.emote-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+.emote-card { position: relative; }
+.emote-play { width: 100%; min-height: 78px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; background: rgba(255,255,255,.06); color: var(--text); border: 1px solid var(--line); border-radius: 12px; font-size: 13px; }
+.emote-play .ico { font-size: 28px; }
+.emote-play:hover { background: rgba(255,255,255,.14); }
+.fav { position: absolute; top: 4px; right: 4px; background: transparent; border: 0; color: #666; font-size: 16px; }
+.fav.on { color: var(--gold); }
+.emoji-cat { margin: 6px 0; }
+.emoji-btn { font-size: 26px; background: transparent; border: 0; padding: 4px 6px; border-radius: 8px; }
+.emoji-btn:hover { background: rgba(255,255,255,.1); }
+.emoji-float { position: absolute; font-size: 34px; transform-origin: 50% 100%; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
+
+/* ---------------- Lojas / garagem ---------------- */
+#shop { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(1000px, calc(100vw - 24px)); height: min(640px, calc(100vh - 32px)); display: flex; flex-direction: column; z-index: 7; }
+.shop-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.shop-grid { display: grid; grid-template-columns: 340px 1fr; gap: 12px; flex: 1; min-height: 0; margin-top: 8px; }
+#shop-preview { border-radius: 12px; background: linear-gradient(180deg, #1c2533, #0e131b); min-height: 260px; overflow: hidden; }
+#shop-body { overflow-y: auto; }
+.item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.item { background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; cursor: pointer; }
+.item.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.item.locked { opacity: .5; cursor: default; }
+.item small { color: var(--muted); font-size: 11px; }
+.price { color: var(--accent-2); font-weight: 700; }
+.st { font-size: 10px; font-weight: 800; letter-spacing: .05em; padding: 2px 6px; border-radius: 5px; align-self: flex-start; }
+.st.good { background: rgba(34,201,139,.18); color: #7ef0c3; }
+.st.warn { background: rgba(245,185,66,.18); color: #ffd98a; }
+.st.off { background: rgba(255,255,255,.1); color: #aaa; }
+.sw { width: 26px; height: 26px; border-radius: 50%; border: 2px solid rgba(255,255,255,.3); padding: 0; }
+.sw.on { border-color: #fff; }
+.btn[disabled] { opacity: .4; }
+
+/* ---------------- Controlos tácteis ---------------- */
+#touch { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+#touch .hidden { display: none !important; }
+#joy { position: absolute; left: 22px; bottom: 26px; width: 136px; height: 136px; border-radius: 50%; background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.25); pointer-events: auto; touch-action: none; }
+#joy-knob { position: absolute; left: 50%; top: 50%; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; background: rgba(255,255,255,.75); }
+.tbtns { position: absolute; right: 18px; bottom: 24px; display: grid; grid-template-columns: repeat(2, 64px); gap: 12px; pointer-events: auto; }
+.tb { width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(255,255,255,.3); background: rgba(12,16,24,.6); color: #fff; font-size: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; touch-action: none; }
+.tb small { font-size: 9px; color: #cfd6df; }
+.tb.big { background: rgba(240,68,74,.75); }
+.tb.on { background: rgba(34,201,139,.7); }
+.tb.small { width: 48px; height: 48px; }
+.tbar { position: absolute; top: 116px; right: 12px; display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
+.tbar button { width: 52px; height: 52px; border-radius: 14px; border: 1px solid rgba(255,255,255,.25); background: rgba(12,16,24,.65); font-size: 24px; }
+body.touch #help, body.touch #speedo { display: none; }
+body.touch #minimap { width: 120px; height: 120px; top: 12px; right: 12px; bottom: auto; }
+body.touch #hud-top-right { top: 140px; right: 74px; display: none; }
+body.touch #chat { left: 170px; bottom: 16px; width: calc(100vw - 340px); max-width: 360px; }
+body.touch #chat.collapsed { display: none; }
+body.touch #chat-log { max-height: 72px; font-size: 12px; }
+body.touch #prompt { bottom: 180px; font-size: 14px; }
+body.touch #hud-top-left { padding: 6px 10px; min-width: 0; }
+body.touch .clock { font-size: 22px; }
+body.touch #preview-label { display: none; }
+@media (max-width: 760px) {
+  .shop-grid { grid-template-columns: 1fr; grid-template-rows: 200px 1fr; }
+  #shop { height: calc(100vh - 16px); width: calc(100vw - 12px); }
+  #menu { width: calc(100vw - 12px); max-height: calc(100vh - 16px); }
+  #expr { bottom: 12px; }
+  .emote-grid { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); }
+  #dialogue { bottom: 8px; }
+}
+@media (orientation: portrait) and (pointer: coarse) {
+  .tbtns { bottom: 18px; }
+  body.touch #chat { left: 12px; bottom: 180px; width: 60vw; }
+}

@@ -13,7 +13,7 @@ import {
   asphaltTexture, sidewalkTexture, wavePavementTexture, grassTexture, dirtTexture, courtTexture,
   facadeTextures, shopfrontTexture, houseTexture, signTexture, FACADE_TILE,
 } from './textures.js';
-import { VehicleModel } from './vehicles.js';
+import { createVehicle } from './vehicles2.js';
 
 /** Uniformes globais das janelas (actualizados pelo ambiente a cada frame). */
 export const WINDOW_UNIFORMS = {
@@ -729,7 +729,7 @@ export class City {
     const colors = ['#f5f5f5', '#212121', '#b71c1c', '#0d47a1', '#9e9e9e', '#1b5e20', '#f9a825', '#cfd8dc'];
     for (const v of PARKED_VEHICLES) {
       if (v.usable) continue; // os utilizáveis são geridos pelo servidor (actores)
-      const model = new VehicleModel(v.kind === 'moto' ? 'moto' : 'car', rng.pick(colors));
+      const model = createVehicle(v.kind === 'moto' ? 'moto_ngola' : rng.pick(['sedan_kianda', 'hatch_muxima', 'suv_namibe', 'carrinha_lobito']), { paint: rng.pick(colors), rims: rng.pick(['classica', 'desportiva', 'cromada']) });
       model.root.position.set(v.x, 0, v.z);
       model.root.rotation.y = v.heading;
       this.group.add(model.root);

@@ -27,6 +27,17 @@ const CLOTH_COLORS = ['#e53935', '#fb8c00', '#fdd835', '#43a047', '#00897b', '#1
 const BOTTOM_COLORS = ['#1c2a48', '#263238', '#3e2723', '#455a64', '#c5b38a', '#1a1a1a', '#5d4037', '#283593'];
 const ACCESSORIES = [['nenhum', 6], ['oculos', 2], ['bone', 2], ['chapeu', 1], ['auscultadores', 1], ['fio', 1], ['lenco_cabeca', 1]];
 
+const ACC_SLOT = { bone: 'head', chapeu: 'head', lenco_cabeca: 'head', auscultadores: 'head', oculos: 'eyes', fio: 'neck' };
+
+function buildAccessories(rng, main, gender) {
+  const acc = {};
+  if (main && ACC_SLOT[main]) acc[ACC_SLOT[main]] = main;
+  if (rng.chance(0.25)) acc.wrist = 'relogio';
+  if (rng.chance(0.12)) acc.back = 'mochila';
+  if (gender === 'f' && rng.chance(0.5)) acc.ears = 'brincos';
+  return acc;
+}
+
 function rangePick(rng, [a, b]) { return Math.round(rng.range(a, b) * 100) / 100; }
 
 /** Distribui `count` NPCs pelos arquétipos respeitando mínimos e pesos configurados. */
@@ -61,8 +72,9 @@ export function generateAppearance(rng, gender, archetype, ageGroup) {
     topPattern: (uniform?.top ?? '').includes('capulana') || rng.chance(0.15) ? rng.pick(['capulana', 'riscas', 'liso']) : 'liso',
     bottom: archetype === 'mecanico' ? 'macacao' : rng.pick(BOTTOMS[gender]),
     bottomColor: rng.pick(BOTTOM_COLORS),
-    shoes: rng.pick(['#1a1a1a', '#5d4037', '#f5f5f5', '#8d6e63']),
-    accessory: uniform?.accessory ?? rng.weighted(ACCESSORIES),
+    shoes: archetype === 'seguranca' || archetype === 'mecanico' ? 'botas' : rng.weighted([['tenis', 4], ['sapatos', 2], ['chinelos', 2], ['tenis_brancos', 1]]),
+    shoesColor: rng.pick(['#1a1a1a', '#5d4037', '#f5f5f5', '#8d6e63']),
+    accessories: buildAccessories(rng, uniform?.accessory ?? rng.weighted(ACCESSORIES), gender),
     posture: senior ? 'curvada' : rng.weighted([['normal', 6], ['confiante', 2], ['relaxada', 2]]),
     walkSpeed: Math.round((senior ? rng.range(0.95, 1.15) : rng.range(1.2, 1.55)) * 100) / 100,
   };

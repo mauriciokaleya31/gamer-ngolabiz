@@ -3,7 +3,11 @@
  * Liga o mundo 3D, o servidor autoritativo, o HUD, o áudio e as interacções.
  */
 import * as THREE from 'three';
-import { RACE_TRACK } from '../../shared/zone.js';
+import { RACE_TRACK, POIS } from '../../shared/zone.js';
+import { EMOTE_BY_ID } from '../../shared/emotes.js';
+import { ExpressionsUI } from './ui/expressions.js';
+import { ShopsUI } from './ui/shops.js';
+import { TouchControls, isTouchDevice } from './ui/touch.js';
 import { City } from './city.js';
 import { Environment } from './environment.js';
 import { setMaxAnisotropy } from './textures.js';
@@ -58,6 +62,33 @@ let player = null;
 let actors = null;
 let race = null;
 let talkingTo = null;
+let shopPositions = {};
+let touch = null;
+
+function nearShop(mode) {
+  const p = shopPositions[mode];
+  return !!(p && player && Math.hypot(p.x - player.pos.x, p.z - player.pos.z) <= 12);
+}
+
+const expressions = new ExpressionsUI({
+  net,
+  onEmote: (id) => requestEmote(id),
+  onEmoji: (e) => net.send({ t: 'emoji', e }),
+});
+const shops = new ShopsUI({
+  net,
+  getAppearance: () => player?.appearance ?? {},
+  isNear: (mode) => nearShop(mode),
+  onAppearanceSaved: (a) => { player.setAppearance(a); try { localStorage.setItem('w3d_appearance', JSON.stringify(a)); } catch { /* ignorar */ } },
+});
+
+function requestEmote(id) {
+  if (!player || player.mode !== 'foot' || race) { hud.toast('Emotes disponíveis a pé, fora das corridas.', 'bad'); return; }
+  const def = EMOTE_BY_ID.get(id);
+  const dir = id === 'apontar' ? 0 : null;
+  if (player.playEmote(id, dir)) net.send({ t: 'emote', id, dir });
+  if (def) hud.toast(`${def.icon} ${def.name}`);
+}
 const checkpointMarkers = new THREE.Group();
 scene.add(checkpointMarkers);
 
@@ -136,6 +167,27 @@ function startGame(welcome) {
   actors = new Actors(scene, { quality, net, groundHeightAt: (x, z) => city.groundHeightAt(x, z), tagsEl: $('tags') });
   actors.localId = welcome.you.id;
   actors.setParked(welcome.vehicles);
+  actors.localAnchor = () => player.root.visible ? player.root : player.vehicle?.model.root ?? player.root;
+  player.onEmoteCancelled = () => net.send({ t: 'emote_stop' });
+  expressions.setup(welcome.emotes, welcome.prefs);
+  shops.setup({ catalog: welcome.catalog, owned: welcome.owned, prefs: welcome.prefs });
+  for (const [mode, sh] of Object.entries(welcome.shops)) { const poi = POIS.find((p) => p.id === sh.poi); if (poi) shopPositions[mode] = { x: poi.x, z: poi.z, name: sh.name }; }
+  if (isTouchDevice()) {
+    touch = new TouchControls({
+      player,
+      actions: {
+        interact: () => dispatchKey('KeyE'),
+        shop: () => dispatchKey('KeyB'),
+        vehicle: () => dispatchKey('KeyF'),
+        horn: () => audio.horn(),
+        emotes: () => expressions.toggle('emotes'),
+        emojis: () => expressions.toggle('emojis'),
+        chat: () => { const c = $('chat'); c.classList.toggle('collapsed'); if (!c.classList.contains('collapsed')) $('chat-input').focus(); },
+        menu: () => { player.inputEnabled = !hud.toggleMenu(); },
+      },
+    });
+    $('chat').classList.add('collapsed');
+  }
   hud.setWelcome(welcome);
   hud.show();
   hud.chatLine(null, `Bem-vindo a Kianda Centro, ${welcome.you.displayName}. ${welcome.features.aiDialogue ? 'Os NPCs usam IA generativa no servidor.' : 'Os NPCs respondem com o sistema de diálogo local.'}`);
@@ -184,8 +236,12 @@ net.on('npc_reply', (m) => {
   if (m.error) hud.dialogueLine('npc', m.error, 'local'); else hud.dialogueLine('npc', m.text, m.source);
 });
 net.on('player_profile', (m) => { if (m.profile?.playerId === hud.you?.id) hud.setSelfProfile(m.profile); });
+net.on('emote', (m) => { if (m.playerId === hud.you?.id && player && !player.emoteId) player.playEmote(m.id, m.dir); });
+net.on('emoji', (m) => { if (m.playerId === hud.you?.id) return; const a = actors?.players.get(m.playerId); if (a) hud.chatLine(null, `${a.name ?? ''} ${m.e}`); });
+net.on('error', (m) => { if (['rate', 'cooldown', 'context', 'inactive', 'unknown'].includes(m.code) && player?.emoteId) player.stopEmote(); });
 net.on('vehicle_ok', (m) => {
-  player.enterVehicle(m.kind, m.x, m.z, m.heading, ['#0d47a1', '#b71c1c', '#f5f5f5', '#212121'][m.id.length % 4], { id: m.id });
+  const parked = actors.parked.get(m.id);
+  player.enterVehicle(m.kind, m.x, m.z, m.heading, ['#0d47a1', '#b71c1c', '#f5f5f5', '#212121'][m.id.length % 4], { id: m.id, itemId: m.itemId ?? parked?.item, paint: m.paint ?? parked?.data?.paint, rims: m.rims });
   attachHeadlights();
 });
 net.on('correct', (m) => { if (player && !race) player.teleport(m.x, m.z, m.diag ? m.h : player.heading); });
@@ -257,6 +313,8 @@ function attachHeadlights() {
 }
 
 // ------------------------------------------------------------------ teclas
+function dispatchKey(code) { dispatchEvent(new KeyboardEvent('keydown', { code })); }
+
 function bindGameKeys() {
   addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
@@ -268,9 +326,18 @@ function bindGameKeys() {
         if (npc) openDialogue(npc);
         break;
       }
+      case 'KeyB': {
+        if (player.mode !== 'foot') break;
+        const shop = Object.keys(shopPositions).find((k) => nearShop(k));
+        if (shop) { document.exitPointerLock?.(); shops.open(shop); } else hud.toast('Lojas: Moda Muxima (roupa), Concessionário Kalunga, Garagem Kalunga Motors.');
+        break;
+      }
+      case 'KeyG': e.preventDefault(); document.exitPointerLock?.(); expressions.toggle('emotes'); break;
+      case 'KeyJ': e.preventDefault(); document.exitPointerLock?.(); expressions.toggle('emojis'); break;
+      case 'Digit1': case 'Digit2': case 'Digit3': case 'Digit4': expressions.quick(Number(e.code.slice(-1)) - 1); break;
       case 'KeyF': {
         if (race) break;
-        if (player.vehicle) { player.exitVehicle(); net.send({ t: 'vehicle_exit' }); break; }
+        if (player.vehicle) { player.exitVehicle({ keepModel: true }); net.send({ t: 'vehicle_exit' }); break; }
         const v = actors.nearestParked(player.pos.x, player.pos.z);
         if (v) net.send({ t: 'vehicle_enter', id: v.id });
         break;
@@ -287,7 +354,7 @@ function bindGameKeys() {
       case 'KeyH': if (player.vehicle) audio.horn(); break;
       case 'Tab': e.preventDefault(); document.exitPointerLock?.(); player.inputEnabled = !hud.toggleMenu(); break;
       case 'Enter': e.preventDefault(); document.exitPointerLock?.(); $('chat-input').focus(); break;
-      case 'Escape': closeDialogue(); hud.toggleMenu(false); $('profile').classList.add('hidden'); player.inputEnabled = true; break;
+      case 'Escape': closeDialogue(); hud.toggleMenu(false); shops.close(); expressions.toggle(expressions.tab, false); $('profile').classList.add('hidden'); player.inputEnabled = true; break;
       case 'F6': case 'F7': case 'F8': case 'F9': {
         if (!hud.features.diagnostics) break;
         e.preventDefault();
@@ -335,13 +402,19 @@ function loop(now) {
     const npc = actors.nearestNpc(player.pos.x, player.pos.z);
     const veh = actors.nearestParked(player.pos.x, player.pos.z);
     const pl = actors.nearestPlayer(player.pos.x, player.pos.z, 4);
-    if (npc) { const p = actors.npcProfiles.get(npc.id); hud.setPrompt(`<kbd>E</kbd>Falar com ${p.name} <span class="badge ai">IA · ${p.role}</span>`); }
+    const shopHere = Object.keys(shopPositions).find((k) => nearShop(k));
+    const shopTxt = shopHere ? ` · <kbd>B</kbd>${shopHere === 'wardrobe' ? 'Guarda-roupa' : shopHere === 'dealership' ? 'Concessionário' : 'Garagem'}` : '';
+    if (npc) { const p = actors.npcProfiles.get(npc.id); hud.setPrompt(`<kbd>E</kbd>Falar com ${p.name} <span class="badge ai">IA · ${p.role}</span>${shopTxt}`); }
     else if (veh && !race) hud.setPrompt(`<kbd>F</kbd>Conduzir ${veh.kind === 'moto' ? 'mota' : 'carro'}`);
     else if (pl) hud.setPrompt(`<kbd>P</kbd>Perfil de ${pl.name} <span class="badge human">JOGADOR</span>`);
-    else hud.setPrompt(null);
+    else {
+      const shop = Object.keys(shopPositions).find((k) => nearShop(k));
+      hud.setPrompt(shop ? `<kbd>B</kbd>${shop === 'wardrobe' ? 'Guarda-roupa' : shop === 'dealership' ? 'Concessionário' : 'Garagem'} — ${shopPositions[shop].name}` : null);
+    }
   } else if (player.mode === 'vehicle' && !race) hud.setPrompt('<kbd>F</kbd>Sair do veículo · <kbd>H</kbd>Buzina');
   else hud.setPrompt(null);
   hud.setSpeed(player.speedKmh(), player.mode === 'vehicle');
+  touch?.update(player.mode);
 
   hud.updateClock(vNow, net.time, net.weather);
   if (race) hud.raceTick(race, net.serverNow());

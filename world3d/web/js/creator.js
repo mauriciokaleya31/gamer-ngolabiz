@@ -3,21 +3,24 @@
  * roupa, padrão, acessório, altura) com pré-visualização 3D em tempo real.
  */
 import * as THREE from 'three';
-import { Humanoid } from './humanoid.js';
+import { Humanoid2 } from './character/humanoid2.js';
+import { CLOTHING } from '../../shared/catalog.js';
 
 export const SKIN_TONES = ['#3b2219', '#4a2c20', '#5a3825', '#6b4430', '#7a4f37', '#8d5d3f', '#a06a48', '#b97b54', '#c98e66', '#e0ac85'];
 const HAIR_COLORS = ['#0d0b0a', '#2b1d16', '#4a2f1d', '#8d2a1a', '#c49a54', '#9e9e9e'];
 const COLORS = ['#e53935', '#fb8c00', '#fdd835', '#43a047', '#00897b', '#1e88e5', '#3949ab', '#8e24aa', '#d81b60', '#f5f5f5', '#212121', '#6d4c41'];
 const BOTTOM_COLORS = ['#1c2a48', '#263238', '#3e2723', '#455a64', '#c5b38a', '#1a1a1a', '#5d4037', '#283593'];
 const HAIR = { m: [['curto', 'Curto'], ['degradê', 'Degradê'], ['afro', 'Afro'], ['dreads', 'Dreads'], ['trancas_curtas', 'Tranças curtas'], ['rapado', 'Rapado'], ['careca', 'Careca']], f: [['trancas', 'Tranças'], ['afro', 'Afro'], ['coque', 'Coque'], ['liso_comprido', 'Liso comprido'], ['rabo_cavalo', 'Rabo-de-cavalo'], ['curto', 'Curto'], ['lenco', 'Lenço']] };
-const TOPS = { m: [['t-shirt', 'T-shirt'], ['camisa', 'Camisa'], ['polo', 'Polo'], ['casaco_leve', 'Casaco leve'], ['camisa_capulana', 'Camisa de capulana'], ['fato_treino', 'Fato de treino']], f: [['t-shirt', 'T-shirt'], ['blusa', 'Blusa'], ['vestido', 'Vestido'], ['camisa_capulana', 'Camisa de capulana'], ['casaco_leve', 'Casaco leve'], ['fato_treino', 'Fato de treino']] };
-const BOTTOMS = { m: [['calca_ganga', 'Calças de ganga'], ['calca', 'Calças'], ['calcoes', 'Calções']], f: [['calca_ganga', 'Calças de ganga'], ['saia', 'Saia'], ['saia_capulana', 'Saia de capulana'], ['calca', 'Calças']] };
-const ACC = [['nenhum', 'Nenhum'], ['bone', 'Boné'], ['oculos', 'Óculos'], ['chapeu', 'Chapéu'], ['auscultadores', 'Auscultadores'], ['fio', 'Fio'], ['lenco_cabeca', 'Lenço']];
+/** Opções do catálogo por slot; itens pagos aparecem bloqueados (compram-se na Moda Muxima). */
+const slotOptions = (slot, gender) => CLOTHING.filter((i) => i.slot === slot && (i.gender === 'u' || i.gender === gender) && i.status !== 'indisponivel')
+  .map((i) => [i.id, i.price ? `${i.name} — ${i.price} Kz demo (Moda Muxima)` : i.name, i.price > 0]);
+const BEARDS = [['nenhuma', 'Sem barba'], ['barba_curta', 'Barba curta'], ['bigode', 'Bigode'], ['pera', 'Pêra']];
+const BODY = [['magro', 'Magro'], ['medio', 'Médio'], ['robusto', 'Robusto']];
 
 const $ = (id) => document.getElementById(id);
 
 export function defaultAppearance() {
-  return { gender: 'm', skinTone: SKIN_TONES[3], face: { shape: 0, eyes: 0, beard: 'nenhuma' }, hairStyle: 'curto', hairColor: HAIR_COLORS[0], top: 't-shirt', topColor: '#1e88e5', topPattern: 'liso', bottom: 'calca_ganga', bottomColor: BOTTOM_COLORS[0], shoes: '#1a1a1a', accessory: 'nenhum', height: 1.75, bodyType: 'medio' };
+  return { gender: 'm', skinTone: SKIN_TONES[3], face: { shape: 0, eyes: 0, beard: 'nenhuma' }, hairStyle: 'curto', hairColor: HAIR_COLORS[0], top: 't-shirt', topColor: '#1e88e5', topPattern: 'liso', bottom: 'calca_ganga', bottomColor: BOTTOM_COLORS[0], shoes: 'tenis', shoesColor: '#1a1a1a', accessories: {}, height: 1.75, bodyType: 'medio' };
 }
 
 export class CharacterCreator {
@@ -68,7 +71,7 @@ export class CharacterCreator {
 
   rebuild() {
     this.holder.clear();
-    this.model = new Humanoid(this.a, { shadows: false });
+    this.model = new Humanoid2(this.a, { shadows: false });
     this.model.setAnim('idle');
     this.holder.add(this.model.root);
   }
@@ -86,12 +89,13 @@ export class CharacterCreator {
     }
   }
 
-  options(id, list, key) {
+  options(id, list, key, get = (a) => a[key], set = (a, v) => { a[key] = v; }) {
     const el = $(id);
-    el.innerHTML = list.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
-    if (!list.some(([v]) => v === this.a[key])) this.a[key] = list[0][0];
-    el.value = this.a[key];
-    el.onchange = () => { this.a[key] = el.value; this.rebuild(); };
+    if (!el) return;
+    el.innerHTML = list.map(([v, l, locked]) => `<option value="${v}" ${locked ? 'disabled' : ''}>${l}</option>`).join('');
+    if (!list.some(([v, , locked]) => v === get(this.a) && !locked)) set(this.a, list.find(([, , locked]) => !locked)[0]);
+    el.value = get(this.a);
+    el.onchange = () => { set(this.a, el.value); this.rebuild(); };
   }
 
   seg(id, onPick, current) {
@@ -106,8 +110,9 @@ export class CharacterCreator {
     const g = () => this.a.gender;
     const refreshGendered = () => {
       this.options('cr-hair', HAIR[g()], 'hairStyle');
-      this.options('cr-top', TOPS[g()], 'top');
-      this.options('cr-bottom', BOTTOMS[g()], 'bottom');
+      this.options('cr-top', slotOptions('top', g()), 'top');
+      this.options('cr-bottom', slotOptions('bottom', g()), 'bottom');
+      this.options('cr-shoes', slotOptions('shoes', g()), 'shoes');
     };
     this.seg('cr-gender', (v) => { this.a.gender = v; refreshGendered(); this.rebuild(); }, this.a.gender);
     this.seg('cr-face', (v) => { this.a.face = { ...this.a.face, shape: Number(v), eyes: Number(v) }; this.rebuild(); }, this.a.face.shape);
@@ -117,7 +122,8 @@ export class CharacterCreator {
     this.swatches('cr-topcolor', COLORS, 'topColor');
     this.swatches('cr-bottomcolor', BOTTOM_COLORS, 'bottomColor');
     refreshGendered();
-    this.options('cr-acc', ACC, 'accessory');
+    this.options('cr-acc', BEARDS, 'beard', (a) => a.face?.beard ?? 'nenhuma', (a, v) => { a.face = { ...a.face, beard: v }; });
+    this.options('cr-body', BODY, 'bodyType');
     const h = $('cr-height');
     h.value = this.a.height;
     h.oninput = () => { this.a.height = Number(h.value); this.rebuild(); };

@@ -76,6 +76,7 @@ export function createWorldServer({ world, env }) {
       if (path === '/api/time') return json(res, 200, world.clock.publicState(), cors);
       if (path === '/api/weather') return json(res, 200, world.weather.publicState(), cors);
       if (path === '/api/zone') return json(res, 200, exportZone(), cors);
+      if (path === '/api/catalog') return json(res, 200, { catalog: world.shop.publicCatalog(), emotes: world.expressions.publicList() }, cors);
       if (path === '/api/leaderboard') return json(res, 200, { rows: world.store.leaderboard(50) }, cors);
       if (path.startsWith('/api/races/')) {
         const stored = world.store.getRace(decodeURIComponent(path.slice('/api/races/'.length)));
@@ -125,6 +126,29 @@ export function createWorldServer({ world, env }) {
           }));
           audit('training_bots', { count: bots.length });
           return json(res, 200, { config: world.updateAdminConfig({ competitions: { trainingBots: bots } }) }, cors);
+        }
+        if (path === '/admin/catalog' && req.method === 'GET') {
+          return json(res, 200, { catalog: world.shop.catalog, emotes: world.expressions.list(), overrides: { catalog: world.adminConfig.catalog.overrides, emotes: world.adminConfig.emotes.overrides } }, cors);
+        }
+        if (path === '/admin/catalog' && req.method === 'PUT') {
+          const body = await readBody(req);
+          const clean = (src, allowed) => Object.fromEntries(Object.entries(src ?? {}).filter(([id]) => allowed.has(id)).map(([id, o]) => {
+            const v = {};
+            if (typeof o.active === 'boolean') v.active = o.active;
+            if (typeof o.published === 'boolean') v.published = o.published;
+            if (['pronto', 'provisorio', 'indisponivel'].includes(o.status)) v.status = o.status;
+            if (Number.isFinite(Number(o.price)) && o.price !== null && o.price !== '') v.price = Math.max(0, Math.min(1e6, Math.round(Number(o.price))));
+            if (typeof o.category === 'string') v.category = o.category.slice(0, 32);
+            if (typeof o.thumbnail === 'string' && /^(https:\/\/|assets\/)[\w./:%-]{1,200}$/.test(o.thumbnail)) v.thumbnail = o.thumbnail;
+            if (Number.isFinite(Number(o.durationMs)) && o.durationMs) v.durationMs = Math.max(500, Math.min(20000, Number(o.durationMs)));
+            if (Number.isFinite(Number(o.cooldownMs)) && o.cooldownMs !== undefined) v.cooldownMs = Math.max(0, Math.min(60000, Number(o.cooldownMs)));
+            return [id, v];
+          }));
+          const cat = clean(body.catalog, new Set(world.shop.catalog.map((i) => i.id)));
+          const emo = clean(body.emotes, new Set(world.expressions.list().map((e) => e.id)));
+          audit('catalog', { items: Object.keys(cat).length, emotes: Object.keys(emo).length });
+          const cfg = world.updateAdminConfig({ catalog: { overrides: { ...world.adminConfig.catalog.overrides, ...cat } }, emotes: { overrides: { ...world.adminConfig.emotes.overrides, ...emo } } });
+          return json(res, 200, { overrides: { catalog: cfg.catalog.overrides, emotes: cfg.emotes.overrides } }, cors);
         }
         if (path === '/admin/ledger/verify') return json(res, 200, world.ledger.verify(), cors);
         if (path === '/admin/audit') return json(res, 200, { rows: world.store.recentAudit(Number(url.searchParams.get('limit')) || 50, url.searchParams.get('type')) }, cors);

@@ -35,6 +35,11 @@ CREATE TABLE IF NOT EXISTS ledger_entries (
   amount INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_entries_account ON ledger_entries(account_id);
+CREATE TABLE IF NOT EXISTS inventory (
+  player_id TEXT NOT NULL, item_id TEXT NOT NULL, acquired_at INTEGER NOT NULL, source TEXT NOT NULL, txn_id TEXT,
+  PRIMARY KEY (player_id, item_id)
+);
+CREATE TABLE IF NOT EXISTS player_prefs (player_id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS escrows (
   id TEXT PRIMARY KEY, competition_id TEXT UNIQUE NOT NULL, stake INTEGER NOT NULL, participants TEXT NOT NULL,
   status TEXT NOT NULL, fee_pct REAL NOT NULL, created_at INTEGER NOT NULL, closed_at INTEGER
@@ -159,6 +164,26 @@ export class Store {
 
   purgeOldMemories(olderThanMs) {
     return this.db.prepare('DELETE FROM npc_memory WHERE updated_at < ?').run(Date.now() - olderThanMs).changes;
+  }
+
+  // --- inventário e preferências ---
+  ownedItems(playerId) {
+    return this.db.prepare('SELECT item_id FROM inventory WHERE player_id = ?').all(playerId).map((r) => r.item_id);
+  }
+
+  grantItem(playerId, itemId, source, txnId = null) {
+    this.db.prepare('INSERT OR IGNORE INTO inventory (player_id, item_id, acquired_at, source, txn_id) VALUES (?, ?, ?, ?, ?)').run(playerId, itemId, Date.now(), source, txnId);
+  }
+
+  getPrefs(playerId) {
+    const r = this.db.prepare('SELECT data FROM player_prefs WHERE player_id = ?').get(playerId);
+    return r ? JSON.parse(r.data) : {};
+  }
+
+  setPrefs(playerId, patch) {
+    const data = { ...this.getPrefs(playerId), ...patch };
+    this.db.prepare('INSERT INTO player_prefs (player_id, data, updated_at) VALUES (?, ?, ?) ON CONFLICT(player_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at').run(playerId, JSON.stringify(data), Date.now());
+    return data;
   }
 
   // --- auditoria ---

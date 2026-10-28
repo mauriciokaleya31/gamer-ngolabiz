@@ -4,8 +4,10 @@
  * os snapshots do servidor, LOD de modelos e etiquetas de identidade.
  */
 import * as THREE from 'three';
-import { Humanoid, HumanoidLOD } from './humanoid.js';
-import { VehicleModel } from './vehicles.js';
+import { HumanoidLOD } from './humanoid.js';
+import { Humanoid2 } from './character/humanoid2.js';
+import { emoteAnimation } from './character/emoteAnimations.js';
+import { createVehicle, trafficVehicle } from './vehicles2.js';
 
 const INTERP_DELAY = 150;
 
@@ -57,6 +59,9 @@ export class Actors {
     net.on('npc_appearance', (m) => { for (const p of m.npcs) { this.npcProfiles.set(p.id, p); this.pendingNpc.delete(p.id); const n = this.npcs.get(p.id); if (n) this.rebuildNpc(n); } });
     net.on('appearance_of', (m) => { this.playerAppearances.set(m.playerId, m); const p = this.players.get(m.playerId); if (p) this.rebuildPlayer(p); });
     net.on('vehicles', (m) => this.setParked(m.vehicles));
+    net.on('emote', (m) => this.onEmote(m));
+    net.on('emote_stop', (m) => { const a = this.players.get(m.playerId); if (a) { a.emote = null; a.human?.stopEmote(); } });
+    net.on('emoji', (m) => this.showEmoji(m.playerId, m.e, m.durationMs));
   }
 
   makeTag(kind, name, role) {
@@ -91,8 +96,11 @@ export class Actors {
         if (!this.playerAppearances.has(p.id)) this.net.send({ t: 'appearance_of', playerId: p.id });
         this.rebuildPlayer(a);
       }
-      a.buf.push(t, { x: p.x, y: p.y, z: p.z, h: p.h, a: p.a, s: p.s, v: p.v, vc: p.vc });
+      a.buf.push(t, { x: p.x, y: p.y, z: p.z, h: p.h, a: p.a, s: p.s, v: p.v, vi: p.vi, vp: p.vp, vc: p.vc });
       a.lastSeen = t;
+      // estado do emote vindo do servidor (sincroniza quem chegou depois)
+      if (p.e && (!a.emote || a.emote.id !== p.e.id || a.emote.at !== p.e.at)) this.startEmote(a, p.e.id, p.e.at, p.e.d);
+      else if (!p.e && a.emote) { a.emote = null; a.human?.stopEmote(); }
     }
     for (const [id, a] of this.players) if (!seen.has(id) && t - (a.lastSeen ?? 0) > 3000) this.removeActor(this.players, id);
 
@@ -119,7 +127,7 @@ export class Actors {
       seenC.add(c.id);
       let a = this.cars.get(c.id);
       if (!a) {
-        const model = new VehicleModel(c.k, c.c);
+        const model = trafficVehicle(c.k, c.c);
         a = { id: c.id, buf: new Buffer(), model, root: model.root, driver: c.d, tag: null };
         this.scene.add(model.root);
         this.cars.set(c.id, a);
@@ -135,7 +143,7 @@ export class Actors {
       seenB.add(b.id);
       let a = this.bots.get(b.id);
       if (!a) {
-        const model = new VehicleModel(b.vehicle === 'moto' ? 'moto' : 'car', '#f9a825');
+        const model = createVehicle(b.vehicle === 'moto' ? 'moto_kupapata' : 'hatch_muxima', { paint: '#f9a825' });
         a = { id: b.id, buf: new Buffer(), model, root: model.root, tag: this.makeTag('bot', `🤖 ${b.name}`, 'Bot de treino · IA') };
         this.scene.add(model.root);
         this.bots.set(b.id, a);
@@ -159,9 +167,37 @@ export class Actors {
   rebuildPlayer(a) {
     const info = this.playerAppearances.get(a.id);
     a.root.clear();
-    a.human = new Humanoid(info?.appearance ?? {}, { shadows: this.quality.shadows });
+    a.human = new Humanoid2(info?.appearance ?? {}, { shadows: this.quality.shadows });
     a.root.add(a.human.root);
     a.vehicle = null;
+    if (a.emote) this.startEmote(a, a.emote.id, a.emote.at, a.emote.dir);
+  }
+
+  startEmote(a, id, at, dir = null) {
+    a.emote = { id, at, dir };
+    const fn = emoteAnimation(id);
+    if (!fn || !a.human) return;
+    // converte o instante do servidor para o relógio local de animação
+    const startedAtMs = performance.now() - Math.max(0, this.net.serverNow() - at);
+    a.human.playEmote(id, fn, { startedAtMs, dir });
+  }
+
+  onEmote(m) {
+    if (m.playerId === this.localId) { this.onLocalEmote?.(m); return; }
+    const a = this.players.get(m.playerId);
+    if (a) this.startEmote(a, m.id, m.at, m.dir);
+  }
+
+  /** Emoji flutuante sobre a personagem (sobe e desvanece). */
+  showEmoji(playerId, e, durationMs = 2600) {
+    const anchor = playerId === this.localId ? this.localAnchor?.() : this.players.get(playerId)?.root;
+    if (!anchor) return;
+    const el = document.createElement('div');
+    el.className = 'emoji-float';
+    el.textContent = e;
+    this.tagsEl.appendChild(el);
+    this.floating = this.floating ?? [];
+    this.floating.push({ el, anchor, t0: performance.now(), dur: durationMs });
   }
 
   rebuildNpc(a, detail = a.detail ?? 'lod') {
@@ -169,7 +205,7 @@ export class Actors {
     if (!prof) return;
     a.root.clear();
     a.detail = detail;
-    a.model = detail === 'full' ? new Humanoid(prof.appearance, { shadows: this.quality.shadows }) : new HumanoidLOD(prof.appearance);
+    a.model = detail === 'full' ? new Humanoid2(prof.appearance, { shadows: this.quality.shadows && this.quality.name !== 'baixa' }) : new HumanoidLOD(prof.appearance);
     a.root.add(a.model.root);
     if (!a.tag) a.tag = this.makeTag('npc', prof.name, `${prof.role}`);
   }
@@ -180,8 +216,9 @@ export class Actors {
     for (const v of list) {
       let a = this.parked.get(v.id);
       if (!a) {
-        const model = new VehicleModel(v.kind, v.kind === 'moto' ? '#263238' : ['#0d47a1', '#b71c1c', '#f5f5f5', '#212121'][v.id.length % 4]);
-        a = { id: v.id, model, root: model.root, kind: v.kind };
+        const item = v.itemId ?? (v.kind === 'moto' ? 'moto_ngola' : ['sedan_kianda', 'hatch_muxima', 'suv_namibe', 'sedan_kianda'][v.id.length % 4]);
+        const model = createVehicle(item, { paint: v.paint ?? (v.kind === 'moto' ? '#263238' : ['#0d47a1', '#b71c1c', '#f5f5f5', '#212121'][v.id.length % 4]), rims: v.rims });
+        a = { id: v.id, model, root: model.root, kind: v.kind, item, owner: v.owner };
         this.scene.add(model.root);
         this.parked.set(v.id, a);
       }
@@ -194,10 +231,14 @@ export class Actors {
 
   /** Veículo estacionado livre mais próximo (para a acção "F — conduzir"). */
   nearestParked(x, z, max = 4.5) {
+    // o veículo próprio tem prioridade sobre os públicos ao lado
+    for (const a of this.parked.values()) {
+      if (a.data.owner === this.localId && !a.data.occupant && Math.hypot(a.data.x - x, a.data.z - z) < max + 1) return a;
+    }
     let best = null;
     let bd = max;
     for (const a of this.parked.values()) {
-      if (a.data.occupant) continue;
+      if (a.data.occupant || (a.data.owner && a.data.owner !== this.localId)) continue;
       const d = Math.hypot(a.data.x - x, a.data.z - z);
       if (d < bd) { bd = d; best = a; }
     }
@@ -256,9 +297,11 @@ export class Actors {
       a.root.position.set(s.x, s.y ?? this.groundHeightAt(s.x, s.z), s.z);
       a.root.rotation.y = s.h;
       const inVeh = !!s.v;
-      if (inVeh && (!a.vehicle || a.vehicle.kind !== s.v)) {
+      const vehKey = `${s.v}:${s.vi}:${s.vp}`;
+      if (inVeh && (!a.vehicle || a.vehicleKey !== vehKey)) {
         a.root.clear();
-        a.vehicle = new VehicleModel(s.v, s.vc || '#3949ab');
+        a.vehicle = createVehicle(s.vi ?? (s.v === 'moto' ? 'moto_ngola' : 'sedan_kianda'), { paint: s.vp ?? s.vc ?? '#3949ab' });
+        a.vehicleKey = vehKey;
         a.root.add(a.vehicle.root);
         a.human = null;
       } else if (!inVeh && !a.human) this.rebuildPlayer(a);
@@ -303,6 +346,21 @@ export class Actors {
       a.model.setLights(lightsOn, false);
       placeTag(a.tag, a.root.position, 2.0, 80);
     }
-    for (const a of this.parked.values()) a.model.setLights(false, false);
+    for (const a of this.parked.values()) { a.model.setLights(false, false); a.model.animate?.(dt, 0, 0); }
+    // emojis flutuantes
+    if (this.floating?.length) {
+      const now = performance.now();
+      this.floating = this.floating.filter((f) => {
+        const k = (now - f.t0) / f.dur;
+        if (k >= 1) { f.el.remove(); return false; }
+        const pos = f.anchor.position ?? f.anchor;
+        v.set(pos.x, pos.y + 2.3 + k * 0.8, pos.z).project(camera);
+        if (v.z > 1) { f.el.style.display = 'none'; return true; }
+        f.el.style.display = '';
+        f.el.style.transform = `translate(-50%, -100%) translate(${((v.x + 1) / 2) * w}px, ${((1 - v.y) / 2) * h}px) scale(${0.8 + Math.min(1, k * 6) * 0.5})`;
+        f.el.style.opacity = String(Math.min(1, (1 - k) * 3));
+        return true;
+      });
+    }
   }
 }

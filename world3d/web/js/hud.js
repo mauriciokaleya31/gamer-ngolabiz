@@ -45,6 +45,7 @@ export class Hud {
     net.on('system', (m) => this.chatLine(null, m.text));
     net.on('error', (m) => this.toast(m.message, 'bad'));
     net.on('wallet', (m) => { this.wallet = m.wallet; this.walletHistory = m.history; this.renderWallet(); if (this.menuTab === 'carteira') this.renderMenu(); });
+    net.on('shop_result', (m) => { this.wallet = m.wallet; this.renderWallet(); });
     net.on('leaderboard', (m) => { this.leaderboard = m.rows; if (this.menuTab === 'ranking') this.renderMenu(); });
     net.on('friends', (m) => { this.friends = m.friends; if (this.menuTab === 'social') this.renderMenu(); });
     net.on('party', (m) => { this.party = m.party; if (this.menuTab === 'social') this.renderMenu(); });

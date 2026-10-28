@@ -49,6 +49,10 @@ export function defaultAdminConfig() {
     clock: { mode: 'realtime', dayLengthMinutes: 1440 },
     competitions: { raceEnabled: true, stakesEnabled: true, feePct: 10, trainingBots: DEFAULT_TRAINING_BOTS.map((b) => ({ ...b })) },
     zone: { status: 'active', maintenanceMessage: '' },
+    // sobreposições por id (active, price, status, category, thumbnail, published)
+    catalog: { overrides: {} },
+    // sobreposições por id de emote (active, durationMs, cooldownMs)
+    emotes: { overrides: {} },
   };
 }
 

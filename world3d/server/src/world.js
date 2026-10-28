@@ -17,10 +17,13 @@ import { greetingFor, ambientLine } from './dialogue/local.js';
 import { DemoLedger } from './economy/ledger.js';
 import { RaceManager, RaceError } from './competition/race.js';
 import { defaultAdminConfig, mergeAdminConfig } from './config.js';
+import { ExpressionService } from './expressions.js';
+import { ShopService, GARAGE_SPAWN, SHOP_LOCATIONS } from './shop.js';
+import { EMOTE_LIMITS } from '../../shared/emotes.js';
 
 const POI_NAME = new Map(POIS.map((p) => [p.id, p.name]));
 const MAX_SPEED = { foot: 9.5, car: 62, moto: 66 };
-const APPEARANCE_KEYS = ['gender', 'skinTone', 'hairStyle', 'hairColor', 'top', 'topColor', 'topPattern', 'bottom', 'bottomColor', 'shoes', 'accessory', 'height', 'bodyType', 'face'];
+const APPEARANCE_KEYS = ['gender', 'skinTone', 'hairStyle', 'hairColor', 'top', 'topColor', 'topPattern', 'bottom', 'bottomColor', 'shoes', 'shoesColor', 'accessory', 'accessories', 'height', 'bodyType', 'face'];
 
 export function sanitizeAppearance(a = {}) {
   const out = {};
@@ -28,7 +31,8 @@ export function sanitizeAppearance(a = {}) {
     const v = a[k];
     if (v === undefined || v === null) continue;
     if (k === 'height') out[k] = Math.max(1.5, Math.min(2.0, Number(v) || 1.75));
-    else if (k === 'face') out[k] = { shape: (Number(v.shape) | 0) % 4, eyes: (Number(v.eyes) | 0) % 4, beard: String(v.beard ?? 'nenhuma').slice(0, 16) };
+    else if (k === 'face') out[k] = { shape: (Number(v.shape) | 0) % 4, eyes: (Number(v.eyes) | 0) % 4, beard: String(v.beard ?? 'nenhuma').replace(/[^\w-]/g, '').slice(0, 16), brows: (Number(v.brows) | 0) % 3 };
+    else if (k === 'accessories') out[k] = Object.fromEntries(Object.entries(typeof v === 'object' ? v : {}).slice(0, 8).map(([sk, sv]) => [String(sk).replace(/[^\w]/g, '').slice(0, 10), String(sv).replace(/[^\w-]/g, '').slice(0, 24)]));
     else out[k] = String(v).replace(/[^#\w-]/g, '').slice(0, 24);
   }
   out.gender = out.gender === 'f' ? 'f' : 'm';
@@ -69,6 +73,8 @@ export class World {
       onTeleport: (pid, x, z) => this.teleport(pid, x, z),
       config: { feePct: cfg.competitions.feePct },
     });
+    this.expressions = new ExpressionService({ now, overrides: cfg.emotes.overrides });
+    this.shop = new ShopService({ store, ledger: this.ledger, overrides: cfg.catalog.overrides });
     this.players = new Map();
     this.parties = new Map();
     this.vehicles = new Map(PARKED_VEHICLES.filter((v) => v.usable).map((v) => [v.id, { ...v, occupant: null, color: null }]));
@@ -124,7 +130,8 @@ export class World {
       const others = [];
       for (const o of players) {
         if (o === p || !o.ready || Math.hypot(o.x - p.x, o.z - p.z) > 220) continue;
-        others.push({ id: o.id, n: o.displayName, x: o.x, y: o.y, z: o.z, h: o.h, a: o.anim, s: o.speed, v: o.vehicle, vc: o.vehicleColor, g: o.isGuest ? 1 : 0 });
+        const e = o.emote ? { id: o.emote.id, at: o.emote.startedAt, d: o.emote.dir } : null;
+        others.push({ id: o.id, n: o.displayName, x: o.x, y: o.y, z: o.z, h: o.h, a: o.anim, s: o.speed, v: o.vehicle, vi: o.vehicleItem, vp: o.vehiclePaint, vc: o.vehicleColor, g: o.isGuest ? 1 : 0, e });
       }
       const snap = {
         t: 'snap', st: now,
@@ -172,7 +179,8 @@ export class World {
     const existing = this.players.get(identity.playerId);
     if (existing) { try { existing.socket.close(4000, 'nova sessão'); } catch { /* ignorar */ } this.leave(identity.playerId); }
     const stored = this.store.getProfile(identity.playerId);
-    const app = sanitizeAppearance(appearance ?? stored?.appearance ?? {});
+    // a aparência guardada na conta prevalece; a enviada pelo cliente é validada contra o inventário
+    const app = this.shop.validateAppearance(identity.playerId, sanitizeAppearance(appearance ?? stored?.appearance ?? {}));
     const profile = this.store.upsertProfile({ playerId: identity.playerId, displayName: identity.displayName, appearance: app, isGuest: identity.isGuest });
     const spawn = PLAYER_SPAWNS[this.players.size % PLAYER_SPAWNS.length];
     const p = {
@@ -189,6 +197,11 @@ export class World {
       env: this.envMessage(),
       vehicles: this.vehicleList(),
       wallet,
+      catalog: this.shop.publicCatalog(),
+      owned: this.shop.owned(p.id),
+      emotes: this.expressions.publicList(),
+      prefs: this.store.getPrefs(p.id),
+      shops: Object.fromEntries(Object.entries(SHOP_LOCATIONS).map(([k, v]) => [k, { name: v.name, poi: v.poi }])),
       trainingBots: this.adminConfig.competitions.trainingBots.map((b) => ({ id: b.id, name: b.name, difficulty: b.difficulty, vehicle: b.vehicle })),
       features: { raceEnabled: this.adminConfig.competitions.raceEnabled, stakesEnabled: this.adminConfig.competitions.stakesEnabled, diagnostics: this.env.development, aiDialogue: this.dialogue.config.aiEnabled && this.dialogue.provider.available() },
       serverNowMs: this.now(),
@@ -204,6 +217,7 @@ export class World {
     this.races.onDisconnect(playerId);
     if (p.vehicleId) this.releaseVehicle(p);
     if (p.partyId) this.leaveParty(p);
+    if (this.vehicles.delete(`pv_${playerId}`)) this.broadcastVehicles();
     this.players.delete(playerId);
     this.broadcastSystem(`${p.displayName} saiu.`, playerId);
   }
@@ -213,7 +227,7 @@ export class World {
   }
 
   vehicleList() {
-    return [...this.vehicles.values()].map((v) => ({ id: v.id, kind: v.kind, x: v.x, z: v.z, heading: v.heading, occupant: v.occupant }));
+    return [...this.vehicles.values()].map((v) => ({ id: v.id, kind: v.kind, x: v.x, z: v.z, heading: v.heading, occupant: v.occupant, itemId: v.itemId ?? null, paint: v.paint ?? null, rims: v.rims ?? null, owner: v.owner ?? null }));
   }
 
   releaseVehicle(p) {
@@ -221,6 +235,8 @@ export class World {
     if (v) { v.occupant = null; v.x = p.x; v.z = p.z; v.heading = p.h; }
     p.vehicleId = null;
     p.vehicle = null;
+    p.vehicleItem = null;
+    p.vehiclePaint = null;
     p.inVehicle = false;
     this.broadcastVehicles();
   }
@@ -278,6 +294,9 @@ export class World {
       p.inVehicle = false;
     }
     p.lastStateAt = now;
+    p.inRace = this.races.inCompetition(p.id);
+    const stop = this.expressions.maintain(p);
+    if (stop) this.broadcastNear(p, stop);
     this.races.onPlayerState(p.id, x, z, now);
   }
 
@@ -311,9 +330,27 @@ export class World {
         case 'wallet': return this.sendTo(p.id, { t: 'wallet', wallet: this.ledger.wallet(p.id), history: this.ledger.history(p.id, 15) });
         case 'leaderboard': return this.sendTo(p.id, { t: 'leaderboard', rows: this.store.leaderboard(20) });
         case 'appearance': {
-          p.appearance = sanitizeAppearance(m.appearance);
+          p.appearance = this.shop.validateAppearance(p.id, sanitizeAppearance(m.appearance));
           this.store.upsertProfile({ playerId: p.id, displayName: p.displayName, appearance: p.appearance, isGuest: p.isGuest });
-          return this.sendTo(p.id, { t: 'system', text: 'Aparência guardada.' });
+          for (const o of this.players.values()) if (o.id !== p.id) this.sendTo(o.id, { t: 'appearance_of', playerId: p.id, appearance: p.appearance, displayName: p.displayName, isGuest: p.isGuest });
+          return this.sendTo(p.id, { t: 'appearance_saved', appearance: p.appearance });
+        }
+        case 'emote': return this.broadcastNear(p, this.expressions.startEmote(p, m.id, { dir: m.dir, inRace: this.races.inCompetition(p.id) }));
+        case 'emote_stop': { const ev = this.expressions.stopEmote(p); return ev && this.broadcastNear(p, ev); }
+        case 'emoji': return this.broadcastNear(p, this.expressions.emoji(p, m.e));
+        case 'emote_favorites': {
+          const prefs = this.store.setPrefs(p.id, { emoteFavorites: this.expressions.sanitizeFavorites(m.ids) });
+          return this.sendTo(p.id, { t: 'prefs', prefs });
+        }
+        case 'shop_buy': {
+          const r = this.shop.buy(p, m.itemId);
+          return this.sendTo(p.id, { t: 'shop_result', ok: true, itemId: r.item.id, owned: this.shop.owned(p.id), wallet: this.ledger.wallet(p.id) });
+        }
+        case 'garage_spawn': return this.onGarageSpawn(p, m);
+        case 'garage_prefs': {
+          const cfg = this.shop.vehicleConfig(p.id, m.itemId, { paint: m.paint, rims: m.rims });
+          const garage = { ...(this.store.getPrefs(p.id).garage ?? {}), [cfg.itemId]: { paint: cfg.paint, rims: cfg.rims } };
+          return this.sendTo(p.id, { t: 'prefs', prefs: this.store.setPrefs(p.id, { garage }) });
         }
         case 'appearance_of': {
           const o = this.players.get(String(m.playerId));
@@ -482,17 +519,41 @@ export class World {
     this.races.startTraining(p, bot, ['car', 'moto'].includes(m.vehicle) ? m.vehicle : 'car');
   }
 
+  /** Difunde um evento aos jogadores próximos (incluindo o próprio). */
+  broadcastNear(p, msg, radius = EMOTE_LIMITS.broadcastRadius) {
+    for (const o of this.players.values()) if (Math.hypot(o.x - p.x, o.z - p.z) <= radius) this.sendTo(o.id, msg);
+  }
+
+  /** Levantar um veículo próprio na garagem (um veículo pessoal por jogador). */
+  onGarageSpawn(p, m) {
+    if (!this.shop.nearShop(p, 'garage')) throw new RaceError(`Vai a ${SHOP_LOCATIONS.garage.name} para levantar o veículo.`, 'far');
+    const prefs = this.store.getPrefs(p.id).garage?.[m.itemId] ?? {};
+    const cfg = this.shop.vehicleConfig(p.id, m.itemId, { paint: m.paint ?? prefs.paint, rims: m.rims ?? prefs.rims });
+    const id = `pv_${p.id}`;
+    const old = this.vehicles.get(id);
+    if (old?.occupant && old.occupant !== p.id) throw new RaceError('O teu veículo está em uso.', 'occupied');
+    if (p.vehicleId === id) this.releaseVehicle(p);
+    this.vehicles.set(id, { id, kind: cfg.kind, itemId: cfg.itemId, paint: cfg.paint, rims: cfg.rims, owner: p.id, x: GARAGE_SPAWN.x, z: GARAGE_SPAWN.z, heading: GARAGE_SPAWN.heading, occupant: null, usable: true });
+    this.broadcastVehicles();
+    this.sendTo(p.id, { t: 'system', text: 'O teu veículo está à porta da Garagem Kalunga Motors.' });
+  }
+
   onVehicleEnter(p, id) {
     const v = this.vehicles.get(id);
     if (!v) throw new RaceError('Veículo inexistente.', 'no_vehicle');
+    if (v.owner && v.owner !== p.id) throw new RaceError('Este veículo pertence a outro jogador.', 'not_owner');
     if (v.occupant && v.occupant !== p.id) throw new RaceError('Veículo ocupado.', 'occupied');
     if (Math.hypot(v.x - p.x, v.z - p.z) > 5) throw new RaceError('Aproxima-te do veículo.', 'far');
     if (p.vehicleId && p.vehicleId !== id) this.releaseVehicle(p);
     v.occupant = p.id;
     p.vehicleId = id;
     p.vehicle = v.kind;
+    p.vehicleItem = v.itemId ?? null;
+    p.vehiclePaint = v.paint ?? null;
     p.inVehicle = true;
-    this.sendTo(p.id, { t: 'vehicle_ok', id, kind: v.kind, x: v.x, z: v.z, heading: v.heading });
+    const ev = this.expressions.stopEmote(p);
+    if (ev) this.broadcastNear(p, ev);
+    this.sendTo(p.id, { t: 'vehicle_ok', id, kind: v.kind, x: v.x, z: v.z, heading: v.heading, itemId: v.itemId ?? null, paint: v.paint ?? null, rims: v.rims ?? null });
     this.broadcastVehicles();
   }
 
@@ -515,6 +576,8 @@ export class World {
     if (JSON.stringify(before.population) !== JSON.stringify(next.population)) this.npcSim.setPopulation(this.buildPopulation());
     Object.assign(this.npcSim.config, next.simulation);
     this.dialogue.configure(next.dialogue);
+    this.expressions.setOverrides(next.emotes.overrides);
+    this.shop.setOverrides(next.catalog.overrides);
     this.traffic.configure(next.traffic);
     this.weather.configure(next.weather);
     if (JSON.stringify(before.clock) !== JSON.stringify(next.clock)) this.clock.configure(next.clock);
