@@ -77,6 +77,9 @@ $total_prizes_kz = 1250000 + ($matches_today_cnt * 5000);
                         <button type="button" class="btn-hero-primary" onclick="openMatchmakingModal('hyperstrike')">
                             <i class="fa-solid fa-play"></i> Entrar na Arena
                         </button>
+                        <a href="<?php echo GAMER_URL; ?>/mundo3d.php" class="btn-hero-secondary" style="border-color: #a855f7; background: rgba(168, 85, 247, 0.18); color: #fff;">
+                            <i class="fa-solid fa-cube" style="color: #a855f7;"></i> Mundo 3D · Kianda Centro
+                        </a>
                         <a href="#arena-mural-section" class="btn-hero-secondary">
                             <i class="fa-solid fa-swords"></i> Ver Duelos Ativos
                         </a>

@@ -8,7 +8,7 @@
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning src/index.js",
     "dev": "WORLD3D_ENV=development node --disable-warning=ExperimentalWarning src/index.js",
-    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js",
+    "test": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 test/*.test.js",
     "loadtest": "node --disable-warning=ExperimentalWarning tools/loadtest.js"
   },
   "dependencies": {
