@@ -200,8 +200,8 @@ button { font-family: inherit; cursor: pointer; }
 .tb.big { background: rgba(240,68,74,.75); }
 .tb.on { background: rgba(34,201,139,.7); }
 .tb.small { width: 48px; height: 48px; }
-.tbar { position: absolute; top: 116px; right: 12px; display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
-.tbar button { width: 52px; height: 52px; border-radius: 14px; border: 1px solid rgba(255,255,255,.25); background: rgba(12,16,24,.65); font-size: 24px; }
+.tbar { position: absolute; top: 10px; right: 142px; display: flex; flex-direction: row; gap: 8px; pointer-events: auto; }
+.tbar button { width: 48px; height: 48px; border-radius: 14px; border: 1px solid rgba(255,255,255,.25); background: rgba(12,16,24,.65); font-size: 24px; }
 body.touch #help, body.touch #speedo { display: none; }
 body.touch #minimap { width: 120px; height: 120px; top: 12px; right: 12px; bottom: auto; }
 body.touch #hud-top-right { top: 140px; right: 74px; display: none; }
@@ -210,6 +210,8 @@ body.touch #chat.collapsed { display: none; }
 body.touch #chat-log { max-height: 72px; font-size: 12px; }
 body.touch #prompt { bottom: 180px; font-size: 14px; }
 body.touch #hud-top-left { padding: 6px 10px; min-width: 0; }
+body.touch #hud-top-left .env-row, body.touch .zone-name { font-size: 11px; }
+@media (max-height: 430px) { body.touch #hud-top-left .env-row { display: none; } body.touch #joy { bottom: 16px; } .tbtns { bottom: 14px; gap: 8px; } }
 body.touch .clock { font-size: 22px; }
 body.touch #preview-label { display: none; }
 @media (max-width: 760px) {
@@ -220,7 +222,8 @@ body.touch #preview-label { display: none; }
   .emote-grid { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); }
   #dialogue { bottom: 8px; }
 }
-@media (orientation: portrait) and (pointer: coarse) {
+@media (orientation: portrait) {
+  body.touch .tbar { top: 144px; right: 12px; flex-direction: column; }
   .tbtns { bottom: 18px; }
   body.touch #chat { left: 12px; bottom: 180px; width: 60vw; }
 }

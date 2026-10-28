@@ -365,7 +365,13 @@ if ($is_admin) {
                         <span>Logs de Auditoria</span>
                     </a>
                 </li>
-                <li class="sidebar-nav-item" style="margin-top: 14px; border-top: 1px solid #1F2736; padding-top: 12px;">
+                <li class="sidebar-nav-item <?php echo ($current_page === 'admin_world') ? 'active' : ''; ?>" style="margin-top: 14px; border-top: 1px solid #1F2736; padding-top: 12px;">
+                    <a href="<?php echo GAMER_URL; ?>/world3d/platform/admin_world.php" style="color: #a855f7;">
+                        <i class="fa-solid fa-cube"></i>
+                        <span>Mundo 3D (Kianda)</span>
+                    </a>
+                </li>
+                <li class="sidebar-nav-item">
                     <a href="<?php echo GAMER_URL; ?>/index.php" style="color: #9AA4B2;">
                         <i class="fa-solid fa-gamepad"></i>
                         <span>Voltar à Arena Gamer</span>
@@ -407,6 +413,12 @@ if ($is_admin) {
                     <a href="<?php echo GAMER_URL; ?>/index.php#arena-games-section">
                         <i class="fa-solid fa-gamepad"></i>
                         <span>Jogos</span>
+                    </a>
+                </li>
+                <li class="sidebar-nav-item <?php echo ($current_page == 'mundo3d') ? 'active' : ''; ?>">
+                    <a href="<?php echo GAMER_URL; ?>/mundo3d.php" style="color: #a855f7; font-weight: 700;">
+                        <i class="fa-solid fa-cube"></i>
+                        <span>Mundo 3D</span>
                     </a>
                 </li>
                 <li class="sidebar-nav-item">
