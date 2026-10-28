@@ -236,11 +236,10 @@ export class Hud {
 
   closeDialogue() { $('dialogue').classList.add('hidden'); }
 
-  dialogueLine(who, text, source) {
+  dialogueLine(who, text) {
     const div = document.createElement('div');
     div.className = who;
-    const label = source === 'ai' ? 'IA generativa' : source === 'fallback' ? 'resposta local' : source === 'local' ? 'resposta local' : '';
-    div.innerHTML = who === 'me' ? `Tu: ${esc(text)}` : `${esc(text)}${label ? `<small>${label}</small>` : ''}`;
+    div.innerHTML = who === 'me' ? `Tu: ${esc(text)}` : `${esc(text)}`;
     $('dlg-log').appendChild(div);
     $('dlg-log').scrollTop = 1e9;
   }
@@ -278,15 +277,14 @@ export class Hud {
       $('m-appearance').onclick = () => this.onAction('edit_appearance');
     } else if (t === 'competicoes') {
       body.innerHTML = `<h3>Corrida no ${esc(RACE_TRACK.name)}</h3>
-        <p class="muted">Uma volta ao anel (Rua das Acácias → Oficina → Parque → Mercado). O resultado é decidido pelo servidor a partir dos pontos de controlo e fica registado com um hash verificável. NPCs não influenciam resultados.</p>
-        <h3>Treinar contra um bot (gratuito)</h3>
-        <p class="muted">Os bots de treino estão identificados como IA e só participam em corridas gratuitas.</p>
-        <table><tr><th>Bot</th><th>Dificuldade</th><th>Veículo</th><th></th></tr>
-        ${this.trainingBots.map((b) => `<tr><td>🤖 ${esc(b.name)}</td><td>${esc(b.difficulty)}</td><td>${b.vehicle === 'moto' ? 'Mota' : 'Carro'}</td><td><button class="btn good" data-bot="${esc(b.id)}" data-veh="car">Carro</button> <button class="btn good" data-bot="${esc(b.id)}" data-veh="moto">Mota</button></td></tr>`).join('')}
+        <p class="muted">Uma volta ao anel (Rua das Acácias → Oficina → Parque → Mercado). O resultado é decidido pelo servidor a partir dos pontos de controlo e fica registado com um hash verificável.</p>
+        <h3>Desafio Rápido de Pista</h3>
+        <p class="muted">Escolhe um piloto da Arena para arrancar imediatamente na pista (Carro ou Mota):</p>
+        <table><tr><th>Piloto</th><th>Dificuldade</th><th>Veículo</th><th></th></tr>
+        ${this.trainingBots.map((b) => `<tr><td>🏎️ ${esc(b.name)}</td><td>${esc(b.difficulty)}</td><td>${b.vehicle === 'moto' ? 'Mota' : 'Carro'}</td><td><button class="btn good" data-bot="${esc(b.id)}" data-veh="car">Carro</button> <button class="btn good" data-bot="${esc(b.id)}" data-veh="moto">Mota</button></td></tr>`).join('')}
         </table>
         <h3>Desafiar outro jogador</h3>
-        <p class="muted">Aproxima-te de um jogador e carrega em <b>P</b> para abrir o perfil e enviar o desafio. Entradas: gratuita ou ${STAKES.slice(1).map((s) => kz(s)).join(', ')} <b>demo</b>. Exemplo: 1.000 + 1.000 = 2.000 → 1.800 ao vencedor e 200 de taxa (demo).</p>
-        <h3>Brevemente</h3><p class="muted">Combate 1 contra 1 e provas de sobrevivência (ainda não disponíveis).</p>`;
+        <p class="muted">Aproxima-te de um jogador e carrega em <b>P</b> para abrir o perfil e enviar o desafio. Entradas: gratuita ou ${STAKES.slice(1).map((s) => kz(s)).join(', ')} <b>demo</b>. Exemplo: 1.000 + 1.000 = 2.000 → 1.800 ao vencedor e 200 de taxa (demo).</p>`;
       body.querySelectorAll('[data-bot]').forEach((b) => { b.onclick = () => { this.net.send({ t: 'train_race', botId: b.dataset.bot, vehicle: b.dataset.veh }); this.toggleMenu(false); }; });
     } else if (t === 'social') {
       const fr = this.friends ?? [];
@@ -338,7 +336,7 @@ export class Hud {
     if (!p) return;
     if (p.playerId === this.you?.id) { this.setSelfProfile(p); return; }
     const el = $('profile');
-    el.innerHTML = `<div class="dlg-head"><div><div class="dlg-name">${esc(p.displayName)}</div><div class="dlg-role">${esc(p.label)}</div></div><span class="badge human">HUMANO</span><button class="icon-btn" id="pf-close">✕</button></div>
+    el.innerHTML = `<div class="dlg-head"><div><div class="dlg-name">${esc(p.displayName)}</div><div class="dlg-role">${esc(p.label)}</div></div><span class="badge human">ONLINE</span><button class="icon-btn" id="pf-close">✕</button></div>
       <div class="stat-grid" style="margin:8px 0"><div class="stat">Corridas<b>${p.races}</b></div><div class="stat">Vitórias<b>${p.wins}</b></div></div>
       <div class="row" style="display:flex;gap:6px;flex-wrap:wrap">
         ${p.friendship === 'accepted' ? '<span class="badge human">AMIGO</span>' : `<button class="btn" id="pf-friend">Adicionar amigo</button>`}
@@ -400,7 +398,7 @@ export class Hud {
     const me = r.participants.find((p) => p.id === this.you?.id);
     const won = r.winnerId === this.you?.id;
     el.innerHTML = `<h2>${won ? '🏆 Vitória!' : r.winnerId ? 'Corrida terminada' : 'Sem vencedor'}</h2>
-      <table style="width:100%;font-size:14px;text-align:left">${r.participants.sort((a, b) => (a.finishMs ?? 1e12) - (b.finishMs ?? 1e12)).map((p, i) => `<tr><td>${i + 1}.</td><td>${p.isBot ? '🤖 ' : '🎮 '}${esc(p.name)}</td><td>${p.status === 'finished' ? formatMs(p.finishMs) : p.status === 'dq' ? `desclassificado (${esc(p.reason)})` : 'não terminou'}</td></tr>`).join('')}</table>
+      <table style="width:100%;font-size:14px;text-align:left">${r.participants.sort((a, b) => (a.finishMs ?? 1e12) - (b.finishMs ?? 1e12)).map((p, i) => `<tr><td>${i + 1}.</td><td>🏁 ${esc(p.name)}</td><td>${p.status === 'finished' ? formatMs(p.finishMs) : p.status === 'dq' ? `desclassificado (${esc(p.reason)})` : 'não terminou'}</td></tr>`).join('')}</table>
       ${r.settlement ? `<p>${r.settlement.prizeKz ? `Prémio: <b>${kz(r.settlement.prizeKz)} demo</b> · taxa ${kz(r.settlement.feeKz)} demo` : 'Entradas reembolsadas.'}</p>` : ''}
       <p class="muted" style="font-size:12px">Resultado decidido pelo servidor. Registo verificável:</p>
       <p class="mono">${esc(m.hash)}</p>

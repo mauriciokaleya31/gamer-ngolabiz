@@ -44,12 +44,15 @@ export class ShopsUI {
 
   isOpen() { return !this.root.classList.contains('hidden'); }
 
-  open(mode) {
+  open(mode = 'wardrobe') {
     this.mode = mode;
     this.slot = mode === 'wardrobe' ? 'top' : null;
     this.draft = normalizeAppearance(structuredClone(this.getAppearance()));
     this.selectedVehicle = null;
     this.flash = '';
+    if (['wardrobe', 'dealership', 'garage', 'betting'].includes(mode) && !this.isNear(mode)) {
+      this.net.send({ t: 'travel', to: mode });
+    }
     this.root.classList.remove('hidden');
     this.ensurePreview();
     this.render();
@@ -126,12 +129,32 @@ export class ShopsUI {
   }
 
   render() {
-    const near = this.isNear(this.mode);
-    const title = { wardrobe: 'Moda Muxima — guarda-roupa', dealership: 'Concessionário Kalunga', garage: 'Garagem Kalunga Motors' }[this.mode];
-    this.root.querySelector('#shop-title').innerHTML = `<b>${title}</b> ${near ? '' : '<span class="st warn">só consulta — vai à loja para comprar/levantar</span>'}`;
+    const near = true;
+    const title = {
+      wardrobe: '👕 Moda Muxima — Loja de Roupa & Acessórios',
+      dealership: '🚗 Concessionário Kalunga — Carros & Motas',
+      garage: '🔧 Garagem Kalunga Motors — Os Teus Veículos',
+      betting: '🏆 Casa de Apostas & Desafios — Arena Kianda',
+    }[this.mode] ?? 'Lojas & Locais de Kianda Centro';
+    this.root.querySelector('#shop-title').innerHTML = `
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;">
+        <b style="margin-right:8px;">${title}</b>
+        <button class="btn ${this.mode === 'wardrobe' ? 'good' : ''}" data-shopmode="wardrobe">👕 Roupa</button>
+        <button class="btn ${this.mode === 'dealership' ? 'good' : ''}" data-shopmode="dealership">🚗 Stand Carros/Motas</button>
+        <button class="btn ${this.mode === 'garage' ? 'good' : ''}" data-shopmode="garage">🔧 Garagem</button>
+        <button class="btn ${this.mode === 'betting' ? 'good' : ''}" data-shopmode="betting">🏆 Casa de Apostas</button>
+        <button class="btn" data-travel="home">🏠 Ir para Casa</button>
+      </div>`;
+    this.root.querySelectorAll('[data-shopmode]').forEach((b) => {
+      b.onclick = () => this.open(b.dataset.shopmode);
+    });
+    this.root.querySelectorAll('[data-travel]').forEach((b) => {
+      b.onclick = () => { this.net.send({ t: 'travel', to: b.dataset.travel }); this.close(); };
+    });
     const body = this.root.querySelector('#shop-body');
     if (this.mode === 'wardrobe') this.renderWardrobe(body, near);
     else if (this.mode === 'dealership') this.renderDealership(body, near);
+    else if (this.mode === 'betting') this.renderBetting(body);
     else this.renderGarage(body, near);
   }
 
@@ -170,7 +193,7 @@ export class ShopsUI {
     });
     const none = body.querySelector('[data-none]');
     if (none) none.onclick = () => { const acc = { ...(d.accessories ?? {}) }; delete acc[this.slot]; d.accessories = acc; this.showCharacter(); this.render(); };
-    body.querySelectorAll('[data-buy]').forEach((b) => { b.onclick = () => this.net.send({ t: 'shop_buy', itemId: b.dataset.buy }); });
+    body.querySelectorAll('[data-buy]').forEach((b) => { b.onclick = () => this.net.send({ t: 'shop_buy', itemId: b.dataset.buy, autoTravel: true }); });
     body.querySelectorAll('[data-color]').forEach((b) => { b.onclick = () => { d[colorKey] = b.dataset.color; this.showCharacter(); }; });
     body.querySelectorAll('[data-pattern]').forEach((b) => { b.onclick = () => { d.topPattern = b.dataset.pattern; this.showCharacter(); this.render(); }; });
     body.querySelector('#shop-save').onclick = () => this.net.send({ t: 'appearance', appearance: d });
@@ -194,7 +217,44 @@ export class ShopsUI {
     body.innerHTML = `<div class="item-grid">${items.map((i) => this.vehicleCard(i, near, 'dealership')).join('')}</div><div class="row muted">${esc(this.flash)}</div>
       <p class="muted">Compras com saldo de demonstração. Os veículos comprados ficam na Garagem Kalunga Motors.</p>`;
     this.bindVehicleCards(body);
-    body.querySelectorAll('[data-buyv]').forEach((b) => { b.onclick = (e) => { e.stopPropagation(); this.net.send({ t: 'shop_buy', itemId: b.dataset.buyv }); }; });
+    body.querySelectorAll('[data-buyv]').forEach((b) => { b.onclick = (e) => { e.stopPropagation(); this.net.send({ t: 'shop_buy', itemId: b.dataset.buyv, autoTravel: true }); }; });
+  }
+
+  renderBetting(body) {
+    body.innerHTML = `
+      <h3 style="margin:4px 0 8px;">🏎️ Corridas & Apostas no Circuito da Kianda</h3>
+      <p class="muted">Escolhe o teu adversário e veículo (Carro ou Mota) para entrar imediatamente na pista de corrida:</p>
+      <div class="item-grid" style="margin-bottom:14px;">
+        <div class="item">
+          <b>🏁 Piloto Kamba (Fácil)</b>
+          <div class="price">Circuito do Anel · 1 Volta</div>
+          <div class="row"><button class="btn good" data-racebot="bot_facil" data-veh="car">🚗 Correr de Carro</button><button class="btn good" data-racebot="bot_facil" data-veh="moto">🏍️ Correr de Mota</button></div>
+        </div>
+        <div class="item">
+          <b>🔥 Piloto Relâmpago (Médio)</b>
+          <div class="price">Circuito do Anel · 1 Volta</div>
+          <div class="row"><button class="btn good" data-racebot="bot_medio" data-veh="car">🚗 Correr de Carro</button><button class="btn good" data-racebot="bot_medio" data-veh="moto">🏍️ Correr de Mota</button></div>
+        </div>
+        <div class="item">
+          <b>⚡ Campeão da Kianda (Difícil)</b>
+          <div class="price">Circuito do Anel · 1 Volta</div>
+          <div class="row"><button class="btn good" data-racebot="bot_dificil" data-veh="car">🚗 Correr de Carro</button><button class="btn good" data-racebot="bot_dificil" data-veh="moto">🏍️ Correr de Mota</button></div>
+        </div>
+      </div>
+      <h3 style="margin:10px 0 8px;">🎰 Jogos de Apostas 1v1 da Arena NgolaBiz</h3>
+      <p class="muted">Entra directamente nos duelos 1v1 com apostas da plataforma:</p>
+      <div class="item-grid">
+        <div class="item"><b>⚡ HyperStrike 1v1</b><small>Combate rápido de arena</small><a class="btn good" href="../../index.php#arena-games-section" style="text-align:center;text-decoration:none;">Jogar na Arena</a></div>
+        <div class="item"><b>🥊 Neon Fist</b><small>Boxe e reflexos 1v1</small><a class="btn good" href="../../index.php#arena-games-section" style="text-align:center;text-decoration:none;">Jogar na Arena</a></div>
+        <div class="item"><b>🐉 Mortal Kombat Arena</b><small>Luta clássica 1v1</small><a class="btn good" href="../../index.php#arena-games-section" style="text-align:center;text-decoration:none;">Jogar na Arena</a></div>
+        <div class="item"><b>🃏 Duelo de Cartas & PPT</b><small>Cartas e Pedra-Papel-Tesoura</small><a class="btn good" href="../../index.php#arena-games-section" style="text-align:center;text-decoration:none;">Jogar na Arena</a></div>
+      </div>`;
+    body.querySelectorAll('[data-racebot]').forEach((b) => {
+      b.onclick = () => {
+        this.net.send({ t: 'train_race', botId: b.dataset.racebot, vehicle: b.dataset.veh });
+        this.close();
+      };
+    });
   }
 
   renderGarage(body, near) {
@@ -214,7 +274,7 @@ export class ShopsUI {
     body.querySelectorAll('[data-rims]').forEach((b) => { b.onclick = () => { this.rims = b.dataset.rims; this.showVehicle(item, this.paint, this.rims); this.render(); }; });
     if (item) {
       body.querySelector('#g-save').onclick = () => this.net.send({ t: 'garage_prefs', itemId: item.id, paint: this.paint, rims: this.rims });
-      body.querySelector('#g-spawn').onclick = () => { this.net.send({ t: 'garage_spawn', itemId: item.id, paint: this.paint, rims: this.rims }); this.close(); };
+      body.querySelector('#g-spawn').onclick = () => { this.net.send({ t: 'garage_spawn', itemId: item.id, paint: this.paint, rims: this.rims, autoTravel: true }); this.close(); };
       if (this.model?.itemId !== item.id) this.showVehicle(item, this.paint, this.rims);
     }
   }

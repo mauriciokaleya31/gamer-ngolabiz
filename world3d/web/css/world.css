@@ -71,9 +71,13 @@ button { font-family: inherit; cursor: pointer; }
 .tag { position: absolute; transform: translate(-50%, -100%); white-space: nowrap; text-align: center; font-size: 12px; text-shadow: 0 1px 2px #000; will-change: transform; }
 .tag .nm { font-weight: 700; }
 .tag .rl { font-size: 11px; opacity: .85; }
-.tag.npc .nm::before { content: "IA · "; color: #c4bbff; font-weight: 800; }
+.tag.npc .nm { color: #f8fafc; font-weight: 800; }
 .tag.player .nm { color: #9fd2ff; }
 .tag.bot .nm { color: #ffd98a; }
+.tag.veh .nm { color: #7ef0c3; background: rgba(12, 16, 24, 0.78); padding: 2px 7px; border-radius: 6px; border: 1px solid rgba(34, 201, 139, 0.45); }
+#quick-actions { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; padding: 6px 10px; z-index: 6; }
+#quick-actions button { background: rgba(255, 255, 255, 0.08); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 11px; font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; }
+#quick-actions button:hover { background: rgba(240, 68, 74, 0.25); border-color: var(--accent); }
 .bubble { position: absolute; transform: translate(-50%, -100%); max-width: 260px; white-space: normal; background: rgba(255, 255, 255, .95); color: #111; font-size: 13px; padding: 6px 10px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0, 0, 0, .35); font-family: Inter, system-ui, sans-serif; }
 .bubble::after { content: ""; position: absolute; left: 50%; bottom: -6px; border: 6px solid transparent; border-top-color: rgba(255, 255, 255, .95); border-bottom: 0; transform: translateX(-50%); }
 

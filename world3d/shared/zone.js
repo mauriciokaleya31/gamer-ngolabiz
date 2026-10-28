@@ -185,21 +185,21 @@ function generateBuildings() {
 
   // --- Marcos (landmarks) do Largo e Avenida ---------------------------------
   add(building('mercado_kianda', -44, -24, -30, -16, { name: 'Mercado Kianda', type: 'shop', district: 'centro', floors: 1, height: 5.2, face: 'S', interior: true, color: '#e9d8b4', openHours: [7, 21], sign: 'MERCADO KIANDA' }));
-  add(building('cafe_marginal', -21, -10, -28, -16, { name: 'Café Marginal', type: 'cafe', district: 'centro', floors: 2, height: 7, face: 'S', color: '#c96f4a', openHours: [6, 23], sign: 'CAFÉ MARGINAL' }));
-  add(building('loja_muxima', 10, 22, -28, -16, { name: 'Moda Muxima', type: 'shop', district: 'centro', floors: 3, height: 10.5, face: 'S', color: '#d8c3a5', openHours: [9, 19], sign: 'MODA MUXIMA' }));
-  add(building('barbearia', 24, 33, -26, -16, { name: 'Barbearia Estilo', type: 'shop', district: 'centro', floors: 2, height: 7, face: 'S', color: '#4f6d7a', openHours: [8, 20], sign: 'BARBEARIA' }));
-  add(building('farmacia', 35, 45, -28, -16, { name: 'Farmácia Ngola', type: 'shop', district: 'centro', floors: 2, height: 7.5, face: 'S', color: '#eef2ee', openHours: [0, 24], sign: 'FARMÁCIA 24H' }));
-  add(building('hotel_kianda', 33, 46, -66, -36, { name: 'Hotel Kianda', type: 'hotel', district: 'centro', floors: 9, height: 30, face: 'W', color: '#d4c8b0', openHours: [0, 24], sign: 'HOTEL KIANDA' }));
+  add(building('cafe_marginal', -21, -10, -28, -16, { name: 'Café Marginal', type: 'cafe', district: 'centro', floors: 2, height: 7, face: 'S', interior: true, color: '#c96f4a', openHours: [6, 23], sign: 'CAFÉ MARGINAL' }));
+  add(building('loja_muxima', 10, 22, -28, -16, { name: 'Moda Muxima', type: 'shop', district: 'centro', floors: 3, height: 10.5, face: 'S', interior: true, color: '#d8c3a5', openHours: [9, 19], sign: 'MODA MUXIMA' }));
+  add(building('barbearia', 24, 33, -26, -16, { name: 'Barbearia Estilo', type: 'shop', district: 'centro', floors: 2, height: 7, face: 'S', interior: true, color: '#4f6d7a', openHours: [8, 20], sign: 'BARBEARIA' }));
+  add(building('farmacia', 35, 45, -28, -16, { name: 'Farmácia Ngola', type: 'shop', district: 'centro', floors: 2, height: 7.5, face: 'S', interior: true, color: '#eef2ee', openHours: [0, 24], sign: 'FARMÁCIA 24H' }));
+  add(building('hotel_kianda', 33, 46, -66, -36, { name: 'Hotel Kianda', type: 'hotel', district: 'centro', floors: 9, height: 30, face: 'W', interior: true, color: '#d4c8b0', openHours: [0, 24], sign: 'HOTEL KIANDA' }));
   add(building('edificio_largo', -46, -33, -64, -36, { name: 'Edifício do Largo', type: 'apartment', district: 'centro', floors: 7, height: 23, face: 'E', color: '#e2cfa8' }));
   add(building('escritorios_acacias', 22, 46, -82, -70, { name: 'Torre Acácias', type: 'office', district: 'centro', floors: 11, height: 38, face: 'N', color: '#9fb3c8', glass: true }));
   add(building('residencial_acacias', -46, -24, -82, -70, { name: 'Residencial Acácias', type: 'apartment', district: 'centro', floors: 6, height: 20, face: 'N', color: '#f0d9b5' }));
-  add(building('ginasio', 16, 45, 60, 82, { name: 'Ginásio Kianda Fit', type: 'gym', district: 'parque', floors: 2, height: 8, face: 'S', color: '#2f3e4e', openHours: [6, 22], sign: 'KIANDA FIT' }));
+  add(building('ginasio', 16, 45, 60, 82, { name: 'Casa de Apostas & Desafios Kianda', type: 'gym', district: 'parque', floors: 2, height: 8, face: 'S', interior: true, color: '#2f3e4e', openHours: [0, 24], sign: 'CASA DE APOSTAS' }));
 
   // --- Zona Kalunga (Este) -------------------------------------------------
-  add(building('oficina_kalunga', 66, 90, -42, -18, { name: 'Oficina Kalunga Motors', type: 'workshop', district: 'oficinas', floors: 1, height: 7, face: 'S', color: '#b9b2a2', garageDoor: true, openHours: [7, 19], sign: 'KALUNGA MOTORS' }));
+  add(building('oficina_kalunga', 66, 90, -42, -18, { name: 'Oficina Kalunga Motors', type: 'workshop', district: 'oficinas', floors: 1, height: 7, face: 'S', interior: true, color: '#b9b2a2', garageDoor: true, openHours: [7, 19], sign: 'KALUNGA MOTORS' }));
   add(building('torre_kalunga', 66, 88, -104, -64, { name: 'Torre Kalunga', type: 'apartment', district: 'oficinas', floors: 14, height: 46, face: 'W', color: '#a9b4be', glass: true }));
   add(building('armazem_norte', 96, 126, -104, -62, { name: 'Armazém Norte', type: 'warehouse', district: 'oficinas', floors: 1, height: 9, face: 'W', color: '#8d969f' }));
-  add(building('restaurante_ilha', 66, 90, 18, 40, { name: 'Restaurante da Ilha', type: 'restaurant', district: 'oficinas', floors: 2, height: 8, face: 'N', color: '#f3e3c3', openHours: [11, 24], sign: 'RESTAURANTE DA ILHA' }));
+  add(building('restaurante_ilha', 66, 90, 18, 40, { name: 'Restaurante da Ilha', type: 'restaurant', district: 'oficinas', floors: 2, height: 8, face: 'N', interior: true, color: '#f3e3c3', openHours: [11, 24], sign: 'RESTAURANTE DA ILHA' }));
   add(building('escritorios_sul', 66, 92, 56, 104, { name: 'Centro Empresarial Sul', type: 'office', district: 'oficinas', floors: 10, height: 34, face: 'W', color: '#c3ccd4', glass: true }));
   add(building('armazem_sul', 98, 126, 56, 104, { name: 'Armazém Sul', type: 'warehouse', district: 'oficinas', floors: 1, height: 10, face: 'W', color: '#9da5ad' }));
 
@@ -242,6 +242,7 @@ function generateBuildings() {
   for (const b of B) {
     if (!b.height) b.height = b.floors * 3.2 + (b.roof === 'gable' ? 0.4 : 0.6);
     b.homeSlots = b.type === 'house' ? 3 : b.type === 'apartment' ? Math.min(12, b.floors * 2) : 0;
+    if (b.type === 'house') b.interior = true;
   }
   return B;
 }
@@ -251,6 +252,7 @@ export const BUILDINGS = Object.freeze(generateBuildings());
 /** Paredes do interior acessível (casca oca com abertura de porta). */
 export function interiorWalls(b, thickness = 0.3, doorWidth = 2.4) {
   const t = thickness;
+  const dw = b.garageDoor ? 4.8 : doorWidth;
   const walls = [];
   const dx = b.doorX ?? b.cx;
   const dz = b.doorZ ?? b.cz;
@@ -259,8 +261,8 @@ export function interiorWalls(b, thickness = 0.3, doorWidth = 2.4) {
   const sideW = { minX: b.minX, maxX: b.minX + t, minZ: b.minZ, maxZ: b.maxZ };
   const sideE = { minX: b.maxX - t, maxX: b.maxX, minZ: b.minZ, maxZ: b.maxZ };
   const split = (w, axis, c) => (axis === 'x'
-    ? [{ ...w, maxX: c - doorWidth / 2 }, { ...w, minX: c + doorWidth / 2 }]
-    : [{ ...w, maxZ: c - doorWidth / 2 }, { ...w, minZ: c + doorWidth / 2 }]);
+    ? [{ ...w, maxX: c - dw / 2 }, { ...w, minX: c + dw / 2 }]
+    : [{ ...w, maxZ: c - dw / 2 }, { ...w, minZ: c + dw / 2 }]);
   walls.push(...(b.face === 'N' ? split(sideN, 'x', dx) : [sideN]));
   walls.push(...(b.face === 'S' ? split(sideS, 'x', dx) : [sideS]));
   walls.push(...(b.face === 'W' ? split(sideW, 'z', dz) : [sideW]));
@@ -274,8 +276,10 @@ export function collisionBoxes() {
   for (const b of BUILDINGS) {
     if (b.interior) {
       for (const w of interiorWalls(b)) boxes.push({ ...w, h: b.height, id: `${b.id}_wall` });
-      // balcão interior
-      boxes.push({ minX: b.minX + 3, maxX: b.minX + 9, minZ: b.minZ + 2, maxZ: b.minZ + 3, h: 1.1, id: `${b.id}_balcao` });
+      if (b.id === 'mercado_kianda') {
+        // balcão interior do mercado
+        boxes.push({ minX: b.minX + 3, maxX: b.minX + 9, minZ: b.minZ + 2, maxZ: b.minZ + 3, h: 1.1, id: `${b.id}_balcao` });
+      }
     } else {
       boxes.push({ minX: b.minX, maxX: b.maxX, minZ: b.minZ, maxZ: b.maxZ, h: b.height, id: b.id });
     }
@@ -425,11 +429,21 @@ export const TRAFFIC_LOOPS = Object.freeze({
 });
 export const THROUGH_LOOPS = Object.freeze(['avenida_este', 'avenida_oeste']);
 
-/** Estacionamento: posições de carros parados (decoração + veículos utilizáveis). */
+/** Estacionamento: posições de carros e motas parados (todos utilizáveis pelo jogador). */
 export const PARKED_VEHICLES = Object.freeze([
-  ...[-120, -108, -96, -84, -40, -28, 70, 84, 96, 120].map((x, i) => ({ id: `park_av_n_${i}`, kind: i % 4 === 3 ? 'moto' : 'car', x, z: -8.5, heading: Math.PI / 2 * -1, usable: i % 3 === 0 })),
-  ...[-118, -100, -20, 26, 40, 78, 108].map((x, i) => ({ id: `park_av_s_${i}`, kind: 'car', x, z: 8.5, heading: Math.PI / 2, usable: i % 2 === 0 })),
-  ...[0, 1, 2, 3, 4, 5].map((i) => ({ id: `park_lot_${i}`, kind: i === 5 ? 'moto' : 'car', x: 100 + (i % 3) * 9, z: i < 3 ? -46 : -24, heading: i < 3 ? 0 : Math.PI, usable: true })),
+  // Junto ao Largo e entrada principal (imediatamente visíveis ao entrar no mundo)
+  { id: 'spawn_car_1', kind: 'car', x: -7.5, z: -21, heading: 0, usable: true },
+  { id: 'spawn_moto_1', kind: 'moto', x: 7.5, z: -21, heading: 0, usable: true },
+  { id: 'spawn_car_2', kind: 'car', x: -14, z: -8.5, heading: -Math.PI / 2, usable: true },
+  { id: 'spawn_moto_2', kind: 'moto', x: -4, z: -8.5, heading: -Math.PI / 2, usable: true },
+  { id: 'spawn_car_3', kind: 'car', x: 6, z: -8.5, heading: -Math.PI / 2, usable: true },
+  { id: 'spawn_moto_3', kind: 'moto', x: 16, z: -8.5, heading: -Math.PI / 2, usable: true },
+  // Junto à Arena e Casa de Apostas
+  { id: 'arena_car_1', kind: 'car', x: 14, z: 8.5, heading: Math.PI / 2, usable: true },
+  { id: 'arena_moto_1', kind: 'moto', x: 22, z: 8.5, heading: Math.PI / 2, usable: true },
+  ...[-120, -108, -96, -84, -40, -28, 70, 84, 96, 120].map((x, i) => ({ id: `park_av_n_${i}`, kind: i % 3 === 1 ? 'moto' : 'car', x, z: -8.5, heading: Math.PI / 2 * -1, usable: true })),
+  ...[-118, -100, -20, 26, 40, 78, 108].map((x, i) => ({ id: `park_av_s_${i}`, kind: i % 3 === 2 ? 'moto' : 'car', x, z: 8.5, heading: Math.PI / 2, usable: true })),
+  ...[0, 1, 2, 3, 4, 5].map((i) => ({ id: `park_lot_${i}`, kind: i >= 4 ? 'moto' : 'car', x: 100 + (i % 3) * 9, z: i < 3 ? -46 : -24, heading: i < 3 ? 0 : Math.PI, usable: true })),
   { id: 'oficina_moto', kind: 'moto', x: 78, z: -15, heading: Math.PI / 2, usable: true },
 ]);
 

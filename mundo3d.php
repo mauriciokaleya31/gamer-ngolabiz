@@ -21,7 +21,7 @@ require_once(__DIR__ . '/header.php');
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:20px;">
         <div>
             <h1 style="font-size:1.8rem;font-weight:800;color:#fff;font-family:var(--font-gamer);">MUNDO 3D · KIANDA CENTRO</h1>
-            <p style="color:var(--text-muted);font-size:.92rem;max-width:720px;">Mundo aberto com habitantes controlados por IA, condução, emotes, amigos e corridas validadas pelo servidor. Hora do mundo sincronizada com <strong>Africa/Luanda</strong>.</p>
+            <p style="color:var(--text-muted);font-size:.92rem;max-width:720px;">Mundo aberto 3D em tempo real com condução de carros e motas, lojas de roupa e veículos, casas, Casa de Apostas, chat com voz e corridas validadas pelo servidor. Hora sincronizada com <strong>Africa/Luanda</strong>.</p>
         </div>
         <div style="text-align:right;">
             <?php if ($w3d_online): ?>
@@ -47,12 +47,12 @@ require_once(__DIR__ . '/header.php');
             <span class="badge text-bg-secondary">BREVEMENTE</span>
         </div>
         <div style="background:#161c26;border:1px solid #273142;border-radius:14px;padding:18px;">
-            <h3 style="color:#fff;font-size:1.1rem;margin-bottom:8px;">Regras importantes</h3>
+            <h3 style="color:#fff;font-size:1.1rem;margin-bottom:8px;">O que podes fazer em Kianda Centro</h3>
             <ul style="color:var(--text-muted);font-size:.86rem;padding-left:18px;margin:0;">
-                <li>Os habitantes do mundo são <strong>personagens de IA</strong> e estão identificados.</li>
-                <li>As competições do Mundo 3D usam apenas <strong>saldo de demonstração</strong> (Kz demo), sem depósitos nem levantamentos e sem ligação à tua carteira real.</li>
-                <li>Bots de treino só entram em corridas gratuitas e estão identificados.</li>
-                <li>O vencedor é decidido pelo servidor e cada resultado tem um registo verificável.</li>
+                <li>Conduzir <strong>carros e motas</strong> estacionados pela cidade ou levantados na Garagem Kalunga Motors.</li>
+                <li>Entrar nas <strong>casas, lojas (Moda Muxima, Stand Kalunga, Mercado) e na Casa de Apostas da Arena</strong>.</li>
+                <li>Conversar por chat e ouvir <strong>vozes distintas em tempo real</strong> para cada pessoa e jogador.</li>
+                <li>Participar em corridas no Circuito do Anel da Kianda com registo verificável pelo servidor.</li>
             </ul>
         </div>
     </div>

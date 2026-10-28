@@ -168,16 +168,36 @@ function startGame(welcome) {
   actors.localId = welcome.you.id;
   actors.setParked(welcome.vehicles);
   actors.localAnchor = () => player.root.visible ? player.root : player.vehicle?.model.root ?? player.root;
+  actors.onBubbleSpeak = (npcId, text, gender) => audio.speak(npcId, text, { gender, priority: false });
   player.onEmoteCancelled = () => net.send({ t: 'emote_stop' });
   expressions.setup(welcome.emotes, welcome.prefs);
   shops.setup({ catalog: welcome.catalog, owned: welcome.owned, prefs: welcome.prefs });
   for (const [mode, sh] of Object.entries(welcome.shops)) { const poi = POIS.find((p) => p.id === sh.poi); if (poi) shopPositions[mode] = { x: poi.x, z: poi.z, name: sh.name }; }
+  shopPositions.betting = { x: 18, z: 22, name: 'Casa de Apostas & Desafios Kianda' };
+  document.querySelectorAll('#quick-actions button[data-qa]').forEach((b) => {
+    b.onclick = () => {
+      const qa = b.dataset.qa;
+      document.exitPointerLock?.();
+      if (qa === 'voice') {
+        audio.voiceEnabled = !audio.voiceEnabled;
+        b.textContent = audio.voiceEnabled ? '🔊 Voz: ON' : '🔇 Voz: OFF';
+        return;
+      }
+      if (qa === 'home') {
+        net.send({ t: 'travel', to: 'home' });
+        hud.toast('🏠 A entrar no Bairro Residencial das Mangueiras…');
+        return;
+      }
+      shops.open(qa);
+    };
+  });
   if (isTouchDevice()) {
     touch = new TouchControls({
       player,
       actions: {
         interact: () => dispatchKey('KeyE'),
-        shop: () => dispatchKey('KeyB'),
+        shop: () => shops.open('wardrobe'),
+        betting: () => shops.open('betting'),
         vehicle: () => dispatchKey('KeyF'),
         horn: () => audio.horn(),
         emotes: () => expressions.toggle('emotes'),
@@ -190,7 +210,7 @@ function startGame(welcome) {
   }
   hud.setWelcome(welcome);
   hud.show();
-  hud.chatLine(null, `Bem-vindo a Kianda Centro, ${welcome.you.displayName}. ${welcome.features.aiDialogue ? 'Os NPCs usam IA generativa no servidor.' : 'Os NPCs respondem com o sistema de diálogo local.'}`);
+  hud.chatLine(null, `Bem-vindo a Kianda Centro, ${welcome.you.displayName}! Explora a cidade, entra nas casas, lojas e na Casa de Apostas da Arena, conduz carros e motas ou conversa com quem está por perto.`);
   audio.start();
   bindGameKeys();
   canvas.focus();
@@ -233,7 +253,27 @@ $('dlg-input').addEventListener('keydown', (e) => { if (e.key === 'Escape') clos
 
 net.on('npc_reply', (m) => {
   if (m.npcId !== talkingTo) return;
-  if (m.error) hud.dialogueLine('npc', m.error, 'local'); else hud.dialogueLine('npc', m.text, m.source);
+  if (m.error) hud.dialogueLine('npc', m.error, 'local');
+  else {
+    hud.dialogueLine('npc', m.text, m.source);
+    const prof = actors?.npcProfiles.get(m.npcId);
+    audio.speak(m.npcId, m.text, { gender: prof?.appearance?.gender ?? 'm', priority: true });
+  }
+});
+net.on('chat', (m) => {
+  if (!m?.text) return;
+  const isMe = m.from === hud.you?.id;
+  const gender = isMe ? (player?.appearance?.gender ?? 'm') : (actors?.playerAppearances.get(m.from)?.appearance?.gender ?? 'm');
+  audio.speak(m.from || m.name || 'chat', m.text, { gender, priority: true });
+  if (!isMe) {
+    const a = actors?.players.get(m.from);
+    if (a?.bubble) {
+      a.bubble.textContent = m.text;
+      a.bubble.style.display = '';
+      clearTimeout(a.bubbleTimer);
+      a.bubbleTimer = setTimeout(() => { if (a.bubble) a.bubble.style.display = 'none'; }, 5500);
+    }
+  }
 });
 net.on('player_profile', (m) => { if (m.profile?.playerId === hud.you?.id) hud.setSelfProfile(m.profile); });
 net.on('emote', (m) => { if (m.playerId === hud.you?.id && player && !player.emoteId) player.playEmote(m.id, m.dir); });
@@ -323,13 +363,18 @@ function bindGameKeys() {
       case 'KeyE': {
         if (talkingTo || player.mode !== 'foot') break;
         const npc = actors.nearestNpc(player.pos.x, player.pos.z);
-        if (npc) openDialogue(npc);
+        if (npc) { openDialogue(npc); break; }
+        if (nearShop('betting') || Math.hypot(player.pos.x - 30, player.pos.z - 62) <= 14) {
+          document.exitPointerLock?.();
+          shops.open('betting');
+        }
         break;
       }
       case 'KeyB': {
         if (player.mode !== 'foot') break;
-        const shop = Object.keys(shopPositions).find((k) => nearShop(k));
-        if (shop) { document.exitPointerLock?.(); shops.open(shop); } else hud.toast('Lojas: Moda Muxima (roupa), Concessionário Kalunga, Garagem Kalunga Motors.');
+        const shop = Object.keys(shopPositions).find((k) => nearShop(k)) ?? 'wardrobe';
+        document.exitPointerLock?.();
+        shops.open(shop);
         break;
       }
       case 'KeyG': e.preventDefault(); document.exitPointerLock?.(); expressions.toggle('emotes'); break;
@@ -347,7 +392,7 @@ function bindGameKeys() {
         if (p) net.send({ t: 'player_profile', playerId: p.id });
         else {
           const npc = actors.nearestNpc(player.pos.x, player.pos.z, 6);
-          if (npc) { const prof = actors.npcProfiles.get(npc.id); hud.toast(`${prof.name} — ${prof.role}. ${prof.label}.`); }
+          if (npc) { const prof = actors.npcProfiles.get(npc.id); hud.toast(`${prof.name} — ${prof.role}.`); }
         }
         break;
       }
@@ -403,13 +448,14 @@ function loop(now) {
     const veh = actors.nearestParked(player.pos.x, player.pos.z);
     const pl = actors.nearestPlayer(player.pos.x, player.pos.z, 4);
     const shopHere = Object.keys(shopPositions).find((k) => nearShop(k));
-    const shopTxt = shopHere ? ` · <kbd>B</kbd>${shopHere === 'wardrobe' ? 'Guarda-roupa' : shopHere === 'dealership' ? 'Concessionário' : 'Garagem'}` : '';
-    if (npc) { const p = actors.npcProfiles.get(npc.id); hud.setPrompt(`<kbd>E</kbd>Falar com ${p.name} <span class="badge ai">IA · ${p.role}</span>${shopTxt}`); }
-    else if (veh && !race) hud.setPrompt(`<kbd>F</kbd>Conduzir ${veh.kind === 'moto' ? 'mota' : 'carro'}`);
-    else if (pl) hud.setPrompt(`<kbd>P</kbd>Perfil de ${pl.name} <span class="badge human">JOGADOR</span>`);
+    const shopLabel = { wardrobe: 'Loja Moda Muxima', dealership: 'Concessionário Kalunga', garage: 'Garagem Kalunga', betting: 'Casa de Apostas & Desafios' };
+    const shopTxt = shopHere ? ` · <kbd>B</kbd>${shopLabel[shopHere] ?? 'Loja'}` : '';
+    if (npc) { const p = actors.npcProfiles.get(npc.id); hud.setPrompt(`<kbd>E</kbd>Falar com ${p.name} <span class="badge">${p.role}</span>${shopTxt}`); }
+    else if (veh && !race) hud.setPrompt(`<kbd>F</kbd>Conduzir ${veh.kind === 'moto' ? 'mota 🏍️' : 'carro 🚗'}`);
+    else if (pl) hud.setPrompt(`<kbd>P</kbd>Perfil / Desafiar ${pl.name} <span class="badge human">ONLINE</span>`);
     else {
       const shop = Object.keys(shopPositions).find((k) => nearShop(k));
-      hud.setPrompt(shop ? `<kbd>B</kbd>${shop === 'wardrobe' ? 'Guarda-roupa' : shop === 'dealership' ? 'Concessionário' : 'Garagem'} — ${shopPositions[shop].name}` : null);
+      hud.setPrompt(shop ? `<kbd>B</kbd>${shopLabel[shop] ?? 'Abrir'} — ${shopPositions[shop].name}` : null);
     }
   } else if (player.mode === 'vehicle' && !race) hud.setPrompt('<kbd>F</kbd>Sair do veículo · <kbd>H</kbd>Buzina');
   else hud.setPrompt(null);
@@ -426,9 +472,10 @@ function loop(now) {
   let npcsNear = 0;
   for (const a of actors.npcs.values()) if (a.root.position.distanceTo(player.pos) < 25) npcsNear++;
   const inPark = player.pos.x > -45 && player.pos.x < 11 && player.pos.z > 17 && player.pos.z < 81;
+  const inInterior = city.groundHeightAt(player.pos.x, player.pos.z) === 0.12;
   audio.update(dt, env.state.light, w.rain !== undefined ? w : { rain: 0, wind: 0.2 }, { carsNear, npcsNear, inPark, vehicleSpeed: player.vehicle ? player.speed : null, maxSpeed: player.vehicle ? player.vehicle.phys.spec.maxSpeed : 1 });
   const step = player.consumeFootstep();
-  if (step) audio.footstep(step, inPark ? 'relva' : 'rua');
+  if (step) audio.footstep(step, inPark ? 'relva' : inInterior ? 'interior' : 'rua');
 
   renderer.render(scene, camera);
   frames++;

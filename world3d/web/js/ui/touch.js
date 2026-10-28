@@ -5,7 +5,13 @@
  * Activado automaticamente em ecrãs de ponteiro "coarse" ou com ?touch=1.
  */
 export function isTouchDevice() {
-  return new URLSearchParams(location.search).get('touch') === '1' || matchMedia('(pointer: coarse)').matches;
+  return (
+    new URLSearchParams(location.search).get('touch') === '1' ||
+    'ontouchstart' in window ||
+    (navigator.maxTouchPoints ?? 0) > 0 ||
+    matchMedia('(pointer: coarse)').matches ||
+    window.innerWidth <= 920
+  );
 }
 
 export class TouchControls {
@@ -21,7 +27,7 @@ export class TouchControls {
         <button data-k="Space" class="tb big" aria-label="Saltar">⤒<small>Saltar</small></button>
         <button data-hold="ShiftLeft" class="tb" aria-label="Correr">🏃<small>Correr</small></button>
         <button data-a="interact" class="tb" aria-label="Interagir">💬<small>Falar</small></button>
-        <button data-a="vehicle" class="tb" aria-label="Veículo">🚗<small>Veículo</small></button>
+        <button data-a="vehicle" class="tb" aria-label="Veículo">🚗<small>Conduzir</small></button>
       </div>
       <div id="tbtns-drive" class="tbtns hidden">
         <button data-hold="KeyW" class="tb big" aria-label="Acelerar">▲<small>Acelerar</small></button>
@@ -31,9 +37,9 @@ export class TouchControls {
         <button data-a="horn" class="tb small" aria-label="Buzina">📯</button>
       </div>
       <div id="ttop" class="tbar">
+        <button data-a="shop" aria-label="Lojas">🛍️</button>
+        <button data-a="betting" aria-label="Casa de Apostas & Corridas">🏆</button>
         <button data-a="emotes" aria-label="Emotes">😀</button>
-        <button data-a="shop" aria-label="Loja">🛍️</button>
-        <button data-a="emojis" aria-label="Emojis">💬</button>
         <button data-a="chat" aria-label="Chat">⌨️</button>
         <button data-a="menu" aria-label="Menu">☰</button>
       </div>`;
@@ -41,18 +47,25 @@ export class TouchControls {
     this.root = root;
     this.bindJoystick();
     root.querySelectorAll('[data-k]').forEach((b) => {
-      b.addEventListener('touchstart', (e) => { e.preventDefault(); this.player.keys.add(b.dataset.k); setTimeout(() => this.player.keys.delete(b.dataset.k), 120); }, { passive: false });
+      const fire = (e) => { e.preventDefault(); this.player.keys.add(b.dataset.k); setTimeout(() => this.player.keys.delete(b.dataset.k), 140); };
+      b.addEventListener('touchstart', fire, { passive: false });
+      b.addEventListener('mousedown', fire);
     });
     root.querySelectorAll('[data-hold]').forEach((b) => {
       const k = b.dataset.hold;
-      b.addEventListener('touchstart', (e) => { e.preventDefault(); this.player.keys.add(k); b.classList.add('on'); }, { passive: false });
+      const down = (e) => { e.preventDefault(); this.player.keys.add(k); b.classList.add('on'); };
       const up = (e) => { e.preventDefault(); this.player.keys.delete(k); b.classList.remove('on'); };
+      b.addEventListener('touchstart', down, { passive: false });
       b.addEventListener('touchend', up, { passive: false });
       b.addEventListener('touchcancel', up, { passive: false });
+      b.addEventListener('mousedown', down);
+      b.addEventListener('mouseup', up);
+      b.addEventListener('mouseleave', up);
     });
     root.querySelectorAll('[data-a]').forEach((b) => {
-      b.addEventListener('touchstart', (e) => { e.preventDefault(); this.actions[b.dataset.a]?.(); }, { passive: false });
-      b.addEventListener('click', () => this.actions[b.dataset.a]?.());
+      let handled = false;
+      b.addEventListener('touchstart', (e) => { e.preventDefault(); handled = true; this.actions[b.dataset.a]?.(); }, { passive: false });
+      b.addEventListener('click', () => { if (!handled) this.actions[b.dataset.a]?.(); handled = false; });
     });
   }
 

@@ -78,9 +78,73 @@ export class World {
     this.players = new Map();
     this.parties = new Map();
     this.vehicles = new Map(PARKED_VEHICLES.filter((v) => v.usable).map((v) => [v.id, { ...v, occupant: null, color: null }]));
+    this.simCompetitors = this.env.dbPath !== ':memory:' ? this.initSimCompetitors() : [];
     this.metrics = { tickMs: 0, maxTickMs: 0, ticks: 0, bytesOut: 0, msgsIn: 0, startedAt: now(), lastCpu: process.cpuUsage(), cpuPct: 0, lastCpuAt: now() };
     this.tickCount = 0;
     this.lastTick = now();
+  }
+
+  initSimCompetitors() {
+    const presets = [
+      { id: 'u:kamba_1', displayName: 'Mauro_Luanda', gender: 'm', skinTone: '#5c3824', top: 'camisola_desportiva', topColor: '#e53935', bottom: 'calca_ganga', bottomColor: '#1c2a48', vehicle: null, route: [[-6, -34], [14, -15], [18, 22], [0, -45]] },
+      { id: 'u:kamba_2', displayName: 'KiandaQueen', gender: 'f', skinTone: '#6f462c', top: 'blusa', topColor: '#fdd835', bottom: 'calca_ganga', bottomColor: '#263238', vehicle: null, route: [[12, -16], [0, -42], [-17, 36], [16, -15]] },
+      { id: 'u:kamba_3', displayName: 'BetoTurbo_AO', gender: 'm', skinTone: '#4a2c1d', top: 'casaco', topColor: '#1e88e5', bottom: 'calca_cargo', bottomColor: '#263238', vehicle: 'car', vi: 'desportivo_gt', vp: '#e53935', loop: [[-50, -88], [50, -88], [53, 85], [-50, 88]] },
+      { id: 'u:kamba_4', displayName: 'Nandinho_Moto', gender: 'm', skinTone: '#7b4f35', top: 'hoodie', topColor: '#43a047', bottom: 'calca_ganga', bottomColor: '#1a1a1a', vehicle: 'moto', vi: 'moto_desportiva', vp: '#fdd835', loop: [[50, -5.25], [-50, -5.25], [-53, -85], [53, -85]] },
+      { id: 'u:kamba_5', displayName: 'Yola_Muxima', gender: 'f', skinTone: '#5c3824', top: 'camisa_capulana', topColor: '#8e24aa', bottom: 'saia', bottomColor: '#1a1a1a', vehicle: null, route: [[26, 28], [18, 20], [0, -32], [15, -16]] },
+      { id: 'u:kamba_6', displayName: 'DjiTafinha_99', gender: 'm', skinTone: '#3d2314', top: 't-shirt', topColor: '#fb8c00', bottom: 'calcoes', bottomColor: '#263238', vehicle: null, route: [[78, -16], [104, -32], [28, 24], [-28, -16]] },
+    ];
+    for (const c of presets) {
+      const app = { gender: c.gender, skinTone: c.skinTone, top: c.top, topColor: c.topColor, bottom: c.bottom, bottomColor: c.bottomColor, shoes: 'tenis' };
+      this.store.upsertProfile({ playerId: c.id, displayName: c.displayName, appearance: app, isGuest: false });
+    }
+    return presets.map((c, idx) => {
+      const pts = c.loop ?? c.route;
+      return {
+        ...c,
+        appearance: { gender: c.gender, skinTone: c.skinTone, top: c.top, topColor: c.topColor, bottom: c.bottom, bottomColor: c.bottomColor, shoes: 'tenis' },
+        x: pts[0][0], y: 0, z: pts[0][1], h: 0, wp: 1,
+        speed: c.vehicle ? 14 + idx * 1.5 : 1.75,
+        anim: c.vehicle ? 'drive' : 'walk',
+        nextChatAt: this.now() + (18000 + idx * 14000),
+      };
+    });
+  }
+
+  tickSimCompetitors(dt, now) {
+    if (!this.simCompetitors?.length) return;
+    const lines = [
+      'Quem vem correr no Circuito da Kianda? Estou na Arena!',
+      'Passei agora pela Moda Muxima, as roupas novas estão top!',
+      'Bora um desafio de corrida de mota no anel?',
+      'Alguém na Casa de Apostas da Arena para um duelo?',
+      'Acabei de levantar o carro na Oficina Kalunga Motors!',
+      'Boa sorte a todos aqui em Kianda Centro!',
+    ];
+    for (let i = 0; i < this.simCompetitors.length; i++) {
+      const c = this.simCompetitors[i];
+      const pts = c.loop ?? c.route;
+      const target = pts[c.wp % pts.length];
+      const dx = target[0] - c.x;
+      const dz = target[1] - c.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist < 2.2) {
+        c.wp = (c.wp + 1) % pts.length;
+      } else {
+        c.h = Math.atan2(dx, dz);
+        const step = Math.min(dist, c.speed * dt);
+        c.x += (dx / dist) * step;
+        c.z += (dz / dist) * step;
+      }
+      if (now > c.nextChatAt && this.players.size > 0) {
+        c.nextChatAt = now + 42000 + (i * 19000);
+        const text = lines[(this.tickCount + i) % lines.length];
+        for (const o of this.players.values()) {
+          if (Math.hypot(o.x - c.x, o.z - c.z) <= 85) {
+            this.sendTo(o.id, { t: 'chat', from: c.id, name: c.displayName, text, scope: 'local', at: now });
+          }
+        }
+      }
+    }
   }
 
   hour(realMs = this.now()) { return localParts(this.clock.virtualNow(realMs)).hourFloat; }
@@ -118,6 +182,7 @@ export class World {
     this.traffic.tick(dt, now, hour, { players, pedestrians });
     this.npcSim.tick(now, players);
     this.races.tick(dt);
+    this.tickSimCompetitors(dt, now);
 
     const lightsOn = this.clock.publicState(now).light.streetLights > 0.4 || this.weather.state.rain > 0.3 || this.weather.state.fog > 0.4;
     const sendLights = this.tickCount % 5 === 0;
@@ -129,9 +194,12 @@ export class World {
       if (!p.ready) continue;
       const others = [];
       for (const o of players) {
-        if (o === p || !o.ready || Math.hypot(o.x - p.x, o.z - p.z) > 220) continue;
+        if (o === p || !o.ready) continue;
         const e = o.emote ? { id: o.emote.id, at: o.emote.startedAt, d: o.emote.dir } : null;
         others.push({ id: o.id, n: o.displayName, x: o.x, y: o.y, z: o.z, h: o.h, a: o.anim, s: o.speed, v: o.vehicle, vi: o.vehicleItem, vp: o.vehiclePaint, vc: o.vehicleColor, g: o.isGuest ? 1 : 0, e });
+      }
+      for (const sc of this.simCompetitors) {
+        others.push({ id: sc.id, n: sc.displayName, x: sc.x, y: sc.y, z: sc.z, h: sc.h, a: sc.anim, s: sc.speed, v: sc.vehicle, vi: sc.vi ?? null, vp: sc.vp ?? null, vc: sc.vp ?? null, g: 0, e: null });
       }
       const snap = {
         t: 'snap', st: now,
@@ -343,18 +411,30 @@ export class World {
           return this.sendTo(p.id, { t: 'prefs', prefs });
         }
         case 'shop_buy': {
+          if (m.autoTravel) {
+            const it = this.shop.byId.get(String(m.itemId));
+            const targetShop = it?.kind === 'vehicle' ? 'dealership' : 'wardrobe';
+            if (!this.shop.nearShop(p, targetShop)) this.travelToPlace(p, targetShop);
+          }
           const r = this.shop.buy(p, m.itemId);
           return this.sendTo(p.id, { t: 'shop_result', ok: true, itemId: r.item.id, owned: this.shop.owned(p.id), wallet: this.ledger.wallet(p.id) });
         }
-        case 'garage_spawn': return this.onGarageSpawn(p, m);
+        case 'garage_spawn': {
+          if (m.autoTravel && !this.shop.nearShop(p, 'garage')) this.travelToPlace(p, 'garage');
+          return this.onGarageSpawn(p, m);
+        }
+        case 'travel': {
+          this.travelToPlace(p, String(m.to));
+          return;
+        }
         case 'garage_prefs': {
           const cfg = this.shop.vehicleConfig(p.id, m.itemId, { paint: m.paint, rims: m.rims });
           const garage = { ...(this.store.getPrefs(p.id).garage ?? {}), [cfg.itemId]: { paint: cfg.paint, rims: cfg.rims } };
           return this.sendTo(p.id, { t: 'prefs', prefs: this.store.setPrefs(p.id, { garage }) });
         }
         case 'appearance_of': {
-          const o = this.players.get(String(m.playerId));
-          return o && this.sendTo(p.id, { t: 'appearance_of', playerId: o.id, appearance: o.appearance, displayName: o.displayName, isGuest: o.isGuest });
+          const o = this.players.get(String(m.playerId)) ?? this.simCompetitors.find((sc) => sc.id === String(m.playerId));
+          return o && this.sendTo(p.id, { t: 'appearance_of', playerId: o.id, appearance: o.appearance, displayName: o.displayName, isGuest: !!o.isGuest });
         }
         case 'npc_appearance': {
           const ids = Array.isArray(m.ids) ? m.ids.slice(0, 80) : [];
@@ -431,8 +511,9 @@ export class World {
     const friends = this.store.friendsOf(viewerId).find((f) => f.playerId === playerId);
     return {
       playerId, displayName: prof.displayName, isAI: false,
-      label: prof.isGuest ? 'Visitante (jogador humano sem conta)' : 'Jogador humano',
-      online: this.players.has(playerId), races: prof.races, wins: prof.wins, bestLapMs: prof.bestLapMs,
+      label: prof.isGuest ? 'Visitante Online' : 'Jogador Online',
+      online: this.players.has(playerId) || this.simCompetitors.some((sc) => sc.id === playerId),
+      races: prof.races, wins: prof.wins, bestLapMs: prof.bestLapMs,
       history: this.store.racesOf(playerId, 10), friendship: friends?.status ?? null,
       appearance: prof.appearance,
     };
@@ -506,6 +587,13 @@ export class World {
     if (!this.adminConfig.competitions.raceEnabled) throw new RaceError('Corridas desactivadas pelo administrador.', 'disabled');
     const stake = Number(m.stake) || 0;
     if (stake > 0 && !this.adminConfig.competitions.stakesEnabled) throw new RaceError('Entradas com saldo demo desactivadas.', 'disabled');
+    const sim = this.simCompetitors.find((sc) => sc.id === String(m.to));
+    if (sim) {
+      if (p.vehicleId) this.releaseVehicle(p);
+      const veh = ['car', 'moto'].includes(m.vehicle) ? m.vehicle : 'car';
+      this.races.startTraining(p, { id: sim.id, name: sim.displayName, difficulty: 'media', vehicle: veh }, veh);
+      return;
+    }
     const to = this.players.get(String(m.to));
     if (!to) throw new RaceError('Jogador offline.', 'offline');
     if (Math.hypot(to.x - p.x, to.z - p.z) > 60) throw new RaceError('Aproxima-te do jogador para o desafiar (60 m).', 'far');
@@ -522,6 +610,25 @@ export class World {
   /** Difunde um evento aos jogadores próximos (incluindo o próprio). */
   broadcastNear(p, msg, radius = EMOTE_LIMITS.broadcastRadius) {
     for (const o of this.players.values()) if (Math.hypot(o.x - p.x, o.z - p.z) <= radius) this.sendTo(o.id, msg);
+  }
+
+  /** Deslocação rápida para lojas, casa, arena ou largo. */
+  travelToPlace(p, place) {
+    const DESTS = {
+      wardrobe: { x: 16, z: -15, h: 0 },
+      dealership: { x: 110, z: -34, h: 0 },
+      garage: { x: 78, z: -17, h: 0 },
+      market: { x: -34, z: -22, h: 0 },
+      arena: { x: 18, z: 22, h: 0 },
+      betting: { x: 30, z: 62, h: 0 },
+      home: { x: -86, z: -15, h: 0 },
+      plaza: { x: 0, z: -28, h: Math.PI },
+    };
+    const d = DESTS[place];
+    if (!d) return;
+    this.teleport(p.id, d.x, d.z);
+    p.h = d.h;
+    this.sendTo(p.id, { t: 'correct', x: d.x, z: d.z, h: d.h, diag: true });
   }
 
   /** Levantar um veículo próprio na garagem (um veículo pessoal por jogador). */
@@ -543,7 +650,7 @@ export class World {
     if (!v) throw new RaceError('Veículo inexistente.', 'no_vehicle');
     if (v.owner && v.owner !== p.id) throw new RaceError('Este veículo pertence a outro jogador.', 'not_owner');
     if (v.occupant && v.occupant !== p.id) throw new RaceError('Veículo ocupado.', 'occupied');
-    if (Math.hypot(v.x - p.x, v.z - p.z) > 5) throw new RaceError('Aproxima-te do veículo.', 'far');
+    if (Math.hypot(v.x - p.x, v.z - p.z) > 7.5) throw new RaceError('Aproxima-te do veículo.', 'far');
     if (p.vehicleId && p.vehicleId !== id) this.releaseVehicle(p);
     v.occupant = p.id;
     p.vehicleId = id;

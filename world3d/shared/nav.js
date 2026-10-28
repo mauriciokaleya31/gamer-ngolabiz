@@ -142,7 +142,7 @@ export function buildNavGraph() {
   for (const blk of BLOCKS) {
     for (let x = blk.minX + 2; x <= blk.maxX - 1.5; x += GRID_STEP) {
       for (let z = blk.minZ + 2; z <= blk.maxZ - 1.5; z += GRID_STEP) {
-        if (blocked(x, z) || inCarriageway(x, z, 0.5)) continue;
+        if (blocked(x, z) || inCarriageway(x, z, 0.5) || BUILDINGS.some((b) => pointInRect(x, z, b, 0.4))) continue;
         const pathArea = RESERVED_WALK_AREAS.some((r) => pointInRect(x, z, r));
         gridNodes.push(addNode(x, z, pathArea ? 'path' : 'ground', { block: blk.id }));
       }
@@ -179,7 +179,7 @@ export function buildNavGraph() {
   const poiNodes = new Map();
   const doorNodes = new Map();
   const unlinked = [];
-  for (const b of BUILDINGS.filter((bb) => bb.interior)) {
+  for (const b of BUILDINGS.filter((bb) => bb.interior && POIS.some((p) => p.indoor && p.buildingId === bb.id))) {
     const out = doorPoint(b, 1.6);
     const inn = doorPoint(b, -1.6);
     const o = addNode(out.x, out.z, 'door', { buildingId: b.id });

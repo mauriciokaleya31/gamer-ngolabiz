@@ -90,7 +90,7 @@ export class Actors {
       seen.add(p.id);
       let a = this.players.get(p.id);
       if (!a) {
-        a = { id: p.id, name: p.n, buf: new Buffer(), root: new THREE.Group(), vehicle: null, human: null, tag: this.makeTag(p.g ? 'player guest' : 'player', `🎮 ${p.n}`, p.g ? 'Visitante · jogador humano' : 'Jogador humano'), bubble: this.makeBubble() };
+        a = { id: p.id, name: p.n, buf: new Buffer(), root: new THREE.Group(), vehicle: null, human: null, tag: this.makeTag(p.g ? 'player guest' : 'player', `🎮 ${p.n}`, p.g ? 'Visitante · Online' : 'Jogador Online'), bubble: this.makeBubble() };
         this.scene.add(a.root);
         this.players.set(p.id, a);
         if (!this.playerAppearances.has(p.id)) this.net.send({ t: 'appearance_of', playerId: p.id });
@@ -144,7 +144,7 @@ export class Actors {
       let a = this.bots.get(b.id);
       if (!a) {
         const model = createVehicle(b.vehicle === 'moto' ? 'moto_kupapata' : 'hatch_muxima', { paint: '#f9a825' });
-        a = { id: b.id, buf: new Buffer(), model, root: model.root, tag: this.makeTag('bot', `🤖 ${b.name}`, 'Bot de treino · IA') };
+        a = { id: b.id, buf: new Buffer(), model, root: model.root, tag: this.makeTag('bot', `🏎️ ${b.name}`, 'Piloto da Arena') };
         this.scene.add(model.root);
         this.bots.set(b.id, a);
       }
@@ -218,7 +218,8 @@ export class Actors {
       if (!a) {
         const item = v.itemId ?? (v.kind === 'moto' ? 'moto_ngola' : ['sedan_kianda', 'hatch_muxima', 'suv_namibe', 'sedan_kianda'][v.id.length % 4]);
         const model = createVehicle(item, { paint: v.paint ?? (v.kind === 'moto' ? '#263238' : ['#0d47a1', '#b71c1c', '#f5f5f5', '#212121'][v.id.length % 4]), rims: v.rims });
-        a = { id: v.id, model, root: model.root, kind: v.kind, item, owner: v.owner };
+        const tag = this.makeTag('veh', v.kind === 'moto' ? '🏍️ Mota · [F] Conduzir' : '🚗 Carro · [F] Conduzir', '');
+        a = { id: v.id, model, root: model.root, kind: v.kind, item, owner: v.owner, tag };
         this.scene.add(model.root);
         this.parked.set(v.id, a);
       }
@@ -226,11 +227,12 @@ export class Actors {
       a.root.position.set(v.x, 0, v.z);
       a.root.rotation.y = v.heading;
       a.root.visible = !v.occupant;
+      if (a.tag && v.occupant) a.tag.style.display = 'none';
     }
   }
 
   /** Veículo estacionado livre mais próximo (para a acção "F — conduzir"). */
-  nearestParked(x, z, max = 4.5) {
+  nearestParked(x, z, max = 6.8) {
     // o veículo próprio tem prioridade sobre os públicos ao lado
     for (const a of this.parked.values()) {
       if (a.data.owner === this.localId && !a.data.occupant && Math.hypot(a.data.x - x, a.data.z - z) < max + 1) return a;
@@ -326,7 +328,18 @@ export class Actors {
       a.root.visible = d < this.quality.npcVisibleDistance;
       if (a.model) { a.model.setAnim(s.a); if (a.root.visible) a.model.update(dt, s.s ?? 0); }
       placeTag(a.tag, a.root.position, 2.05, 22);
-      if (s.b) { a.bubble.textContent = s.b; placeTag(a.bubble, a.root.position, 2.55, 26); } else a.bubble.style.display = 'none';
+      if (s.b) {
+        a.bubble.textContent = s.b;
+        placeTag(a.bubble, a.root.position, 2.55, 26);
+        if (a.lastSpokenBubble !== s.b && d < 18) {
+          a.lastSpokenBubble = s.b;
+          const prof = this.npcProfiles.get(a.id);
+          this.onBubbleSpeak?.(a.id, s.b, prof?.appearance?.gender ?? 'm');
+        }
+      } else {
+        a.bubble.style.display = 'none';
+        a.lastSpokenBubble = null;
+      }
     }
 
     for (const a of this.cars.values()) {
@@ -346,7 +359,14 @@ export class Actors {
       a.model.setLights(lightsOn, false);
       placeTag(a.tag, a.root.position, 2.0, 80);
     }
-    for (const a of this.parked.values()) { a.model.setLights(false, false); a.model.animate?.(dt, 0, 0); }
+    for (const a of this.parked.values()) {
+      a.model.setLights(false, false);
+      a.model.animate?.(dt, 0, 0);
+      if (a.tag) {
+        if (a.root.visible) placeTag(a.tag, a.root.position, a.kind === 'moto' ? 1.5 : 1.9, 18);
+        else a.tag.style.display = 'none';
+      }
+    }
     // emojis flutuantes
     if (this.floating?.length) {
       const now = performance.now();

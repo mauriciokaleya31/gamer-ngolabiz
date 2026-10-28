@@ -124,11 +124,29 @@ $total_prizes_kz = 1250000 + ($matches_today_cnt * 5000);
                         <i class="fa-solid fa-fire" style="color: #F0444A;"></i> Jogos em Destaque
                     </h2>
                     <a href="#arena-games-section" class="arena-block-link">
-                        Ver todos (<?php echo count($ARENA_GAMES); ?>) <i class="fa-solid fa-chevron-right" style="font-size: 0.72rem;"></i>
+                        Ver todos (<?php echo count($ARENA_GAMES) + 1; ?>) <i class="fa-solid fa-chevron-right" style="font-size: 0.72rem;"></i>
                     </a>
                 </div>
 
                 <div class="arena-games-5col-grid">
+                    <!-- CARD MUNDO 3D KIANDA CENTRO -->
+                    <div class="arena-game-card-v2" onclick="window.location.href='<?php echo GAMER_URL; ?>/world3d/web/index.html'" style="border-color: rgba(168, 85, 247, 0.55); box-shadow: 0 6px 24px rgba(168, 85, 247, 0.18);">
+                        <div class="arena-game-card-thumb">
+                            <img src="<?php echo GAMER_URL; ?>/images/banners/hero_arena.jpg" alt="Mundo 3D · Kianda Centro" loading="lazy">
+                            <span class="arena-game-card-category-tag" style="background: rgba(168, 85, 247, 0.88); color: #fff;">
+                                <i class="fa-solid fa-cube"></i> Mundo Aberto 3D
+                            </span>
+                        </div>
+                        <div class="arena-game-card-body">
+                            <div class="arena-game-card-name">Mundo 3D · Kianda Centro</div>
+                            <div class="arena-game-card-sub">Cidade 3D Ao Vivo • Carros, Motas, Lojas & Corridas</div>
+                            <div class="game-card-actions-row" style="margin-top: 10px;">
+                                <a href="<?php echo GAMER_URL; ?>/world3d/web/index.html" class="btn-game-play-v2" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; text-decoration: none; background: linear-gradient(135deg, #9333ea, #f0444a);" onclick="event.stopPropagation();">
+                                    <i class="fa-solid fa-cube"></i> Entrar no Mundo 3D
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                     <?php 
                     $game_count = 0;
                     $sample_online_counts = ['hyperstrike' => 14, 'neon-fist' => 11, 'mkjs' => 18, 'card-duel' => 16, 'rps-battle' => 15];

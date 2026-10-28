@@ -366,50 +366,136 @@ export class City {
     this.group.add(m);
   }
 
-  /** Interior acessível: Mercado Kianda (paredes com porta, prateleiras, balcão, frigorífico). */
+  /** Interior acessível: Lojas, Casas, Oficina, Café, Mercado e Casa de Apostas. */
   buildInteriorShop(b) {
-    const wallM = new THREE.MeshStandardMaterial({ color: 0xe9d8b4, roughness: 0.9 });
-    const walls = interiorWalls(b).map((w) => { const g = boxUV(w.maxX - w.minX, b.height, w.maxZ - w.minZ, 3); g.translate((w.minX + w.maxX) / 2, b.height / 2, (w.minZ + w.maxZ) / 2); return g; });
+    const rng = makeRng(`int-${b.id}`);
+    const groundH = b.floors > 1 ? Math.min(4.0, b.height) : b.height;
+    const wallColor = b.type === 'house' ? b.color : b.id === 'loja_muxima' ? 0xf5ebe0 : b.id === 'oficina_kalunga' ? 0xcfd8dc : b.id === 'ginasio' ? 0x1e293b : 0xe9d8b4;
+    const wallM = new THREE.MeshStandardMaterial({ color: wallColor, roughness: 0.88 });
+    const walls = interiorWalls(b).map((w) => {
+      const g = boxUV(w.maxX - w.minX, groundH, w.maxZ - w.minZ, 3);
+      g.translate((w.minX + w.maxX) / 2, groundH / 2, (w.minZ + w.maxZ) / 2);
+      return g;
+    });
     this.add(new THREE.Mesh(mergeGeometries(walls), wallM), { cast: true });
-    const roof = new THREE.Mesh(boxUV(b.maxX - b.minX + 0.4, 0.3, b.maxZ - b.minZ + 0.4, 3), new THREE.MeshStandardMaterial({ color: 0x9e9e9e, roughness: 0.9 }));
-    roof.position.set(b.cx, b.height + 0.15, b.cz);
-    this.add(roof, { cast: true });
-    const floor = new THREE.Mesh(planeXZ(b.minX + 0.3, b.maxX - 0.3, b.minZ + 0.3, b.maxZ - 0.3, 0.12, 1.2), new THREE.MeshStandardMaterial({ map: sidewalkTexture(), color: 0xf3efe6, roughness: 0.4 }));
+
+    // Pisos superiores para edifícios de vários andares (mantém a fachada completa por cima do rés-do-chão)
+    if (b.height > groundH + 0.2) {
+      const floorSlab = new THREE.Mesh(boxUV(b.maxX - b.minX, 0.25, b.maxZ - b.minZ, 3), new THREE.MeshStandardMaterial({ color: 0xd7ccc8, roughness: 0.9 }));
+      floorSlab.position.set(b.cx, groundH, b.cz);
+      this.add(floorSlab, { cast: true });
+      if (b.type === 'house') {
+        const tex = houseTexture(b.color, b.id);
+        const geo = wallsGeometry(b, groundH, b.height, 10, 6.4, rng.next());
+        this.add(new THREE.Mesh(geo, windowMaterial(tex.map, tex.emissive)), { cast: true });
+      } else {
+        const style = b.type === 'hotel' ? 'office' : 'residential';
+        const tex = facadeTextures(style, b.color, b.id.length % 3);
+        const tileW = FACADE_TILE.bays * FACADE_TILE.bayW;
+        const tileH = FACADE_TILE.floors * (b.height / b.floors);
+        const geo = wallsGeometry(b, groundH, b.height, tileW, tileH, rng.next());
+        this.add(new THREE.Mesh(geo, windowMaterial(tex.map, tex.emissive, { rough: 0.85 })), { cast: true });
+      }
+    }
+
+    if (b.type === 'house' && b.roof === 'gable') {
+      this.add(gableRoof(b, rng.pick(['#9c4a2f', '#b5552f', '#7d3b25'])), { cast: true });
+    } else {
+      const roof = new THREE.Mesh(boxUV(b.maxX - b.minX + 0.4, 0.3, b.maxZ - b.minZ + 0.4, 3), new THREE.MeshStandardMaterial({ color: 0x8a8a86, roughness: 0.9 }));
+      roof.position.set(b.cx, b.height + 0.15, b.cz);
+      this.add(roof, { cast: true });
+    }
+
+    const floorColor = b.type === 'house' ? 0xd7b899 : b.id === 'ginasio' ? 0x1e293b : 0xf3efe6;
+    const floor = new THREE.Mesh(planeXZ(b.minX + 0.25, b.maxX - 0.25, b.minZ + 0.25, b.maxZ - 0.25, 0.12, 1.2), new THREE.MeshStandardMaterial({ map: sidewalkTexture(), color: floorColor, roughness: 0.45 }));
     this.add(floor);
-    // painel de luz no tecto (emissivo, ligado de noite e quando a loja está aberta)
+
+    // Painel de luz no tecto do rés-do-chão
     const panelMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff6e0, emissiveIntensity: 1.2 });
-    this.signMaterials.push({ mat: panelMat, openHours: b.openHours, alwaysOnWhenOpen: true, base: 1.2 });
-    for (const x of [b.minX + 5, b.cx, b.maxX - 5]) {
-      const p = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.05, 0.6), panelMat);
-      p.position.set(x, b.height - 0.1, b.cz);
-      this.group.add(p);
+    this.signMaterials.push({ mat: panelMat, openHours: b.openHours ?? [0, 24], alwaysOnWhenOpen: true, base: 1.2 });
+    const p = new THREE.Mesh(new THREE.BoxGeometry(Math.min(2.4, (b.maxX - b.minX) * 0.4), 0.05, 0.6), panelMat);
+    p.position.set(b.cx, groundH - 0.12, b.cz);
+    this.group.add(p);
+
+    if (b.id === 'mercado_kianda') {
+      this.interiorLightPos = new THREE.Vector3(b.cx, groundH - 0.8, b.cz);
+      const counter = new THREE.Mesh(new THREE.BoxGeometry(6, 1.1, 1), new THREE.MeshStandardMaterial({ color: 0x6d4c41, roughness: 0.6 }));
+      counter.position.set(b.minX + 6, 0.55, b.minZ + 2.5);
+      this.add(counter, { cast: true });
+      const shelfM = new THREE.MeshStandardMaterial({ color: 0xbdbdbd, metalness: 0.4, roughness: 0.5 });
+      const products = [];
+      for (let i = 0; i < 3; i++) {
+        const x = b.cx - 2 + i * 4.5;
+        const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.8, 2.0, 7), shelfM);
+        shelf.position.set(x, 1.0, b.cz + 0.5);
+        this.add(shelf, { cast: true });
+        for (let lvl = 0; lvl < 4; lvl++) for (let k = 0; k < 12; k++) for (const sx of [-1, 1]) products.push([x + sx * 0.5, 0.35 + lvl * 0.5, b.cz - 2.8 + k * 0.55, (i * 7 + lvl * 3 + k) % 6]);
+      }
+      const colors = [0xe53935, 0xfdd835, 0x43a047, 0x1e88e5, 0xfb8c00, 0xf5f5f5];
+      const inst = new THREE.InstancedMesh(new THREE.BoxGeometry(0.22, 0.3, 0.4), new THREE.MeshStandardMaterial({ roughness: 0.6 }), products.length);
+      const mtx = new THREE.Matrix4();
+      const c = new THREE.Color();
+      products.forEach(([x, y, z, ci], i) => { mtx.makeTranslation(x, y, z); inst.setMatrixAt(i, mtx); inst.setColorAt(i, c.setHex(colors[ci])); });
+      this.group.add(inst);
+      const fridge = new THREE.Mesh(new THREE.BoxGeometry(3, 2.2, 0.8), new THREE.MeshStandardMaterial({ color: 0xe0f7fa, emissive: 0x80deea, emissiveIntensity: 0.4, roughness: 0.2 }));
+      fridge.position.set(b.maxX - 2.5, 1.1, b.minZ + 1);
+      this.group.add(fridge);
+    } else if (b.id === 'loja_muxima') {
+      // Boutique de roupa: balcão, araras de roupa colorida e espelho
+      const counter = new THREE.Mesh(new THREE.BoxGeometry(3.6, 1.05, 0.9), new THREE.MeshStandardMaterial({ color: 0x4e342e, roughness: 0.5 }));
+      counter.position.set(b.cx, 0.55, b.minZ + 2.2);
+      this.add(counter, { cast: true });
+      const rackColors = [0xe53935, 0x1e88e5, 0xfdd835, 0x8e24aa, 0x43a047];
+      for (const sx of [-3.2, 3.2]) {
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.6, 5.5), new THREE.MeshStandardMaterial({ color: 0x90a4ae, metalness: 0.7, roughness: 0.3 }));
+        bar.position.set(b.cx + sx, 0.9, b.cz + 0.5);
+        this.add(bar, { cast: true });
+        for (let k = 0; k < 5; k++) {
+          const shirt = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.85, 0.35), new THREE.MeshStandardMaterial({ color: rackColors[k], roughness: 0.7 }));
+          shirt.position.set(b.cx + sx, 1.15, b.cz - 1.5 + k * 0.95);
+          this.group.add(shirt);
+        }
+      }
+    } else if (b.id === 'oficina_kalunga') {
+      // Oficina e Garagem: elevador de carros, bancadas de ferramentas vermelhas
+      const lift = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.22, 6.5), new THREE.MeshStandardMaterial({ color: 0x37474f, metalness: 0.5, roughness: 0.5 }));
+      lift.position.set(b.cx, 0.22, b.cz - 1);
+      this.add(lift);
+      const bench = new THREE.Mesh(new THREE.BoxGeometry(6, 1.1, 0.9), new THREE.MeshStandardMaterial({ color: 0xc62828, roughness: 0.4, metalness: 0.3 }));
+      bench.position.set(b.cx, 0.65, b.minZ + 1.5);
+      this.add(bench, { cast: true });
+    } else if (b.id === 'ginasio') {
+      // Casa de Apostas & Desafios Kianda: terminais luminosos e balcão central
+      const desk = new THREE.Mesh(new THREE.BoxGeometry(7, 1.15, 1.2), new THREE.MeshStandardMaterial({ color: 0xb71c1c, roughness: 0.4 }));
+      desk.position.set(b.cx, 0.6, b.minZ + 3.0);
+      this.add(desk, { cast: true });
+      const screenM = new THREE.MeshStandardMaterial({ color: 0x10b981, emissive: 0x10b981, emissiveIntensity: 0.9, roughness: 0.2 });
+      for (let k = -2; k <= 2; k++) {
+        const term = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.8, 0.7), new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.5 }));
+        term.position.set(b.cx + k * 4.2, 1.0, b.cz);
+        this.add(term, { cast: true });
+        const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.85, 0.6), screenM);
+        scr.position.set(b.cx + k * 4.2, 1.35, b.cz + 0.36);
+        this.group.add(scr);
+      }
+    } else if (b.type === 'house') {
+      // Interior de moradia: tapete, sofá e mesa de sala
+      const rug = new THREE.Mesh(planeXZ(b.cx - 1.8, b.cx + 1.8, b.cz - 1.4, b.cz + 1.4, 0.135, 1), new THREE.MeshStandardMaterial({ color: 0x8d3b2f, roughness: 0.9 }));
+      this.group.add(rug);
+      const sofa = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.75, 0.9), new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.8 }));
+      sofa.position.set(b.cx, 0.48, b.cz - 1.6);
+      this.group.add(sofa);
+      const table = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.48, 0.8), new THREE.MeshStandardMaterial({ color: 0x8d6e63, roughness: 0.6 }));
+      table.position.set(b.cx, 0.36, b.cz);
+      this.group.add(table);
+    } else {
+      // Café, restaurante, farmácia, barbearia, hotel
+      const counter = new THREE.Mesh(new THREE.BoxGeometry(Math.min(4.5, (b.maxX - b.minX) * 0.5), 1.05, 0.9), new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.6 }));
+      counter.position.set(b.cx, 0.55, b.minZ + 2.2);
+      this.add(counter, { cast: true });
     }
-    this.interiorLightPos = new THREE.Vector3(b.cx, b.height - 0.8, b.cz);
-    // balcão
-    const counter = new THREE.Mesh(new THREE.BoxGeometry(6, 1.1, 1), new THREE.MeshStandardMaterial({ color: 0x6d4c41, roughness: 0.6 }));
-    counter.position.set(b.minX + 6, 0.55, b.minZ + 2.5);
-    this.add(counter, { cast: true });
-    // prateleiras com produtos (instanciados)
-    const shelfM = new THREE.MeshStandardMaterial({ color: 0xbdbdbd, metalness: 0.4, roughness: 0.5 });
-    const products = [];
-    for (let i = 0; i < 3; i++) {
-      const x = b.cx - 2 + i * 4.5;
-      const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.8, 2.0, 7), shelfM);
-      shelf.position.set(x, 1.0, b.cz + 0.5);
-      this.add(shelf, { cast: true });
-      for (let lvl = 0; lvl < 4; lvl++) for (let k = 0; k < 12; k++) for (const sx of [-1, 1]) products.push([x + sx * 0.5, 0.35 + lvl * 0.5, b.cz - 2.8 + k * 0.55, (i * 7 + lvl * 3 + k) % 6]);
-    }
-    const colors = [0xe53935, 0xfdd835, 0x43a047, 0x1e88e5, 0xfb8c00, 0xf5f5f5];
-    const inst = new THREE.InstancedMesh(new THREE.BoxGeometry(0.22, 0.3, 0.4), new THREE.MeshStandardMaterial({ roughness: 0.6 }), products.length);
-    const mtx = new THREE.Matrix4();
-    const c = new THREE.Color();
-    products.forEach(([x, y, z, ci], i) => { mtx.makeTranslation(x, y, z); inst.setMatrixAt(i, mtx); inst.setColorAt(i, c.setHex(colors[ci])); });
-    this.group.add(inst);
-    const fridge = new THREE.Mesh(new THREE.BoxGeometry(3, 2.2, 0.8), new THREE.MeshStandardMaterial({ color: 0xe0f7fa, emissive: 0x80deea, emissiveIntensity: 0.4, roughness: 0.2 }));
-    fridge.position.set(b.maxX - 2.5, 1.1, b.minZ + 1);
-    this.group.add(fridge);
-    // montras laterais junto à porta + letreiro
-    this.addSign(b, b.height - 1.6);
+
+    if (b.sign) this.addSign(b, Math.min(groundH - 0.6, 3.6));
   }
 
   // ---------------------------------------------------------- largo / jardim
@@ -485,13 +571,17 @@ export class City {
       st.position.set(30, 0.25 + s * 0.5, 51 + s * 1.0);
       this.add(st, { cast: true });
     }
-    // quadro de desafios
-    const tex = signTexture('QUADRO DE DESAFIOS', { bg: '#0d47a1' });
-    const board = new THREE.Mesh(new THREE.BoxGeometry(4, 2.2, 0.2), new THREE.MeshStandardMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.2 }));
-    board.position.set(18, 2.2, 19.5);
+    // quadro de desafios + Pavilhão Casa de Apostas na Arena
+    const tex = signTexture('CASA DE APOSTAS & DESAFIOS', { bg: '#0d47a1' });
+    const board = new THREE.Mesh(new THREE.BoxGeometry(5.2, 2.4, 0.25), new THREE.MeshStandardMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.35 }));
+    board.position.set(18, 2.3, 19.5);
     this.add(board, { cast: true });
-    this.signMaterials.push({ mat: board.material, openHours: [0, 24], base: 0.25 });
-    const arenaSign = signTexture('ARENA KIANDA', { bg: '#b71c1c' });
+    this.signMaterials.push({ mat: board.material, openHours: [0, 24], base: 0.4 });
+    // Cobertura iluminada do Pavilhão de Desafios
+    const pavRoof = new THREE.Mesh(new THREE.BoxGeometry(7.5, 0.35, 5.5), new THREE.MeshStandardMaterial({ color: 0x1e293b, emissive: 0xf5b942, emissiveIntensity: 0.25 }));
+    pavRoof.position.set(18, 4.1, 21.5);
+    this.add(pavRoof, { cast: true });
+    const arenaSign = signTexture('ARENA & APOSTAS KIANDA', { bg: '#b71c1c' });
     const arch = new THREE.Mesh(new THREE.PlaneGeometry(12, 1.6), new THREE.MeshStandardMaterial({ map: arenaSign, emissive: 0xffffff, emissiveMap: arenaSign, emissiveIntensity: 0 }));
     arch.position.set(30, 5.2, 17.2);
     arch.rotation.y = Math.PI;
