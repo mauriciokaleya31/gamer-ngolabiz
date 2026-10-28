@@ -3,7 +3,7 @@
  * roupa, padrão, acessório, altura) com pré-visualização 3D em tempo real.
  */
 import * as THREE from 'three';
-import { Humanoid2 } from './character/humanoid2.js';
+import { Humanoid3 } from './character/humanoid3.js';
 import { CLOTHING } from '../../shared/catalog.js';
 
 export const SKIN_TONES = ['#3b2219', '#4a2c20', '#5a3825', '#6b4430', '#7a4f37', '#8d5d3f', '#a06a48', '#b97b54', '#c98e66', '#e0ac85'];
@@ -71,7 +71,7 @@ export class CharacterCreator {
 
   rebuild() {
     this.holder.clear();
-    this.model = new Humanoid2(this.a, { shadows: false });
+    this.model = new Humanoid3(this.a, { shadows: false });
     this.model.setAnim('idle');
     this.holder.add(this.model.root);
   }

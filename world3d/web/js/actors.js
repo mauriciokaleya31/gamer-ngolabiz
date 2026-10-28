@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import { HumanoidLOD } from './humanoid.js';
-import { Humanoid2 } from './character/humanoid2.js';
+import { Humanoid3 } from './character/humanoid3.js';
 import { emoteAnimation } from './character/emoteAnimations.js';
 import { createVehicle, trafficVehicle } from './vehicles2.js';
 
@@ -167,7 +167,7 @@ export class Actors {
   rebuildPlayer(a) {
     const info = this.playerAppearances.get(a.id);
     a.root.clear();
-    a.human = new Humanoid2(info?.appearance ?? {}, { shadows: this.quality.shadows });
+    a.human = new Humanoid3(info?.appearance ?? {}, { shadows: this.quality.shadows });
     a.root.add(a.human.root);
     a.vehicle = null;
     if (a.emote) this.startEmote(a, a.emote.id, a.emote.at, a.emote.dir);
@@ -205,7 +205,7 @@ export class Actors {
     if (!prof) return;
     a.root.clear();
     a.detail = detail;
-    a.model = detail === 'full' ? new Humanoid2(prof.appearance, { shadows: this.quality.shadows && this.quality.name !== 'baixa' }) : new HumanoidLOD(prof.appearance);
+    a.model = detail === 'full' ? new Humanoid3(prof.appearance, { shadows: this.quality.shadows && this.quality.name !== 'baixa' }) : new HumanoidLOD(prof.appearance);
     a.root.add(a.model.root);
     if (!a.tag) a.tag = this.makeTag('npc', prof.name, `${prof.role}`);
   }

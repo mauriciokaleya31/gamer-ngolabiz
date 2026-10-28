@@ -39,6 +39,7 @@ export class Soundscape {
       src.start();
       return { gain: gnode, filter: f };
     };
+    this.noiseBuf = noiseBuf;
     this.traffic = loop(noiseBuf, 'lowpass', 380);
     this.wind = loop(whiteBuf, 'bandpass', 500, 0.4);
     this.rain = loop(whiteBuf, 'highpass', 1400);
@@ -94,6 +95,26 @@ export class Soundscape {
       o.start(t);
       o.stop(t + 0.5);
     }
+  }
+
+  /** Passo (pé a bater no chão): rajada curta de ruído filtrado, sem ficheiro. */
+  footstep(kind = 'walk', surface = 'rua') {
+    if (!this.ctx || this.ctx.state !== 'running') return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuf;
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = (surface === 'relva' ? 320 : 170) + Math.random() * 90;
+    const g = ctx.createGain();
+    const peak = (kind === 'run' ? 0.17 : 0.09) * (0.85 + Math.random() * 0.3);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(peak, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + (kind === 'run' ? 0.1 : 0.13));
+    src.connect(f).connect(g).connect(this.master);
+    src.start(t, Math.random() * 1.5);
+    src.stop(t + 0.2);
   }
 
   /**

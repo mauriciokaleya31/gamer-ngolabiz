@@ -427,6 +427,8 @@ function loop(now) {
   for (const a of actors.npcs.values()) if (a.root.position.distanceTo(player.pos) < 25) npcsNear++;
   const inPark = player.pos.x > -45 && player.pos.x < 11 && player.pos.z > 17 && player.pos.z < 81;
   audio.update(dt, env.state.light, w.rain !== undefined ? w : { rain: 0, wind: 0.2 }, { carsNear, npcsNear, inPark, vehicleSpeed: player.vehicle ? player.speed : null, maxSpeed: player.vehicle ? player.vehicle.phys.spec.maxSpeed : 1 });
+  const step = player.consumeFootstep();
+  if (step) audio.footstep(step, inPark ? 'relva' : 'rua');
 
   renderer.render(scene, camera);
   frames++;

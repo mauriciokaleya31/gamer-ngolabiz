@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import { collisionBoxes, ZONE_BOUNDS } from '../../shared/zone.js';
-import { Humanoid2 } from './character/humanoid2.js';
+import { Humanoid3 } from './character/humanoid3.js';
 import { emoteAnimation } from './character/emoteAnimations.js';
 import { VehiclePhysics, VEHICLE_SPECS } from './vehicles.js';
 import { createVehicle } from './vehicles2.js';
@@ -31,6 +31,8 @@ export class LocalPlayer {
     this.heading = Math.PI;
     this.speed = 0;
     this.grounded = true;
+    this.stepPhase = 0;
+    this.pendingFootstep = null;
     this.mode = 'foot';
     this.vehicle = null;
     this.keys = new Set();
@@ -46,7 +48,7 @@ export class LocalPlayer {
   setAppearance(appearance) {
     this.appearance = appearance;
     this.root.clear();
-    this.human = new Humanoid2(appearance, { shadows: this.quality.shadows });
+    this.human = new Humanoid3(appearance, { shadows: this.quality.shadows });
     this.root.add(this.human.root);
   }
 
@@ -257,6 +259,11 @@ export class LocalPlayer {
       else if (y - ground < 0.18 && this.vy <= 0) { y = THREE.MathUtils.lerp(y, ground, Math.min(1, dt * 20)); this.grounded = true; }
       this.pos.set(x, y, z);
       this.anim = !this.grounded ? 'jump' : this.speed > 3.2 ? 'run' : this.speed > 0.25 ? 'walk' : (this.talking ? 'talk_idle' : 'idle');
+      // cadência de passos: avança a fase com a velocidade, dispara um passo por ciclo
+      if (this.grounded && (this.anim === 'walk' || this.anim === 'run')) {
+        this.stepPhase += Math.abs(this.speed) * dt / (this.anim === 'run' ? 1.15 : 0.72);
+        if (this.stepPhase >= 1) { this.stepPhase -= Math.floor(this.stepPhase); this.pendingFootstep = this.anim; }
+      } else this.stepPhase = 0;
       if (this.emoteId && !this.human.emote) this.emoteId = null;
       this.root.position.copy(this.pos);
       this.root.rotation.y = this.heading;
@@ -310,6 +317,9 @@ export class LocalPlayer {
   }
 
   speedKmh() { return Math.round(Math.abs(this.speed) * 3.6); }
+
+  /** Consome o passo pendente (para a camada de som tocar o efeito uma só vez). */
+  consumeFootstep() { const k = this.pendingFootstep; this.pendingFootstep = null; return k; }
   maxSpeedKmh() { return this.vehicle ? Math.round(VEHICLE_SPECS[this.vehicle.kind].maxSpeed * 3.6) : 0; }
 }
 
