@@ -1,0 +1,12 @@
+# Dependências e dados gerados (reconstruíveis)
+server/node_modules/
+server/data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+web/node_modules/
+tools/node_modules/
+# Configuração local com segredos (nunca no Git)
+platform/config.local.php
+.env
+.env.*

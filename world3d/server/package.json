@@ -1,0 +1,17 @@
+{
+  "name": "ngolabiz-world3d-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Servidor autoritativo do NgolaBiz World 3D: tempo de Luanda, NPCs, diálogo IA, multijogador, corridas e economia demo.",
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/index.js",
+    "dev": "WORLD3D_ENV=development node --disable-warning=ExperimentalWarning src/index.js",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js",
+    "loadtest": "node --disable-warning=ExperimentalWarning tools/loadtest.js"
+  },
+  "dependencies": {
+    "ws": "8.21.3"
+  }
+}
