@@ -345,16 +345,16 @@ function generateProps() {
 
 export const PROPS = Object.freeze(generateProps());
 
-/** Bancos (assentos) — POIs de "sentar". Cada banco tem 2 lugares. */
+/** Bancos (assentos) — POIs de "sentar". Cada banco tem 2 lugares. angle = rumo de quem se senta (0 = +Z/Sul). */
 function generateBenches() {
   const seats = [];
   const bench = (id, x, z, faceAngle) => seats.push({ id, x, z, angle: faceAngle, seats: 2 });
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2;
-    bench(`banco_largo_${i}`, Math.cos(a) * 8.5, -50 + Math.sin(a) * 6.5, a + Math.PI);
+    bench(`banco_largo_${i}`, Math.cos(a) * 8.5, -50 + Math.sin(a) * 6.5, Math.atan2(-Math.cos(a), -Math.sin(a)));
   }
   for (let i = 0; i < 6; i++) bench(`banco_jardim_${i}`, -38 + i * 8, 46, 0);
-  for (let i = 0; i < 4; i++) bench(`banco_jardim_n_${i}`, -14, 24 + i * 14, Math.PI / 2);
+  for (let i = 0; i < 4; i++) bench(`banco_jardim_n_${i}`, -13.6, 24 + i * 14, -Math.PI / 2);
   bench('banco_paragem', -30, 14.2, Math.PI);
   return seats;
 }

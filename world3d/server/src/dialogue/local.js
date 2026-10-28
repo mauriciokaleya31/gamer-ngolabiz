@@ -46,13 +46,9 @@ function register(npc) {
 function hello(npc, hour) {
   const r = register(npc);
   const saud = hour < 12 ? 'Bom dia' : hour < 19 ? 'Boa tarde' : 'Boa noite';
-  if (r === 'formal') return `${saud}.`;
+  if (r === 'formal') return `${saud}, seja bem-vindo a Kianda Centro.`;
   if (r === 'calao_luandense') return npc.rng.pick(['Eh, mano!', 'Então, kamba!', `${saud}, mano!`]);
   return npc.rng.pick([`${saud}!`, 'Olá!', 'Olá, tudo bem?']);
-}
-
-function you(npc) {
-  return register(npc) === 'formal' ? 'o senhor / a senhora' : 'tu';
 }
 
 export function greetingFor(npc, memory, hour) {
@@ -77,12 +73,17 @@ export function localReply({ npc, text, player, world, memory }) {
 
   switch (intent) {
     case 'identidade':
-      return { intent, final: true, text: `Sou ${npc.def.firstName}, ${role} em Kianda Centro — uma personagem controlada por IA, não uma pessoa real. Mas posso ajudar-${register(npc) === 'formal' ? 'lo' : 'te'} com o que precisares aqui no bairro.` };
+      return { intent, final: true, text: `Sou ${npc.def.firstName}, ${role} em Kianda Centro — uma personagem controlada por IA, não uma pessoa real. Mas posso ajudar com o que precisar${register(npc) === 'formal' ? '' : 'es'} aqui no bairro.` };
     case 'nome_jogador': {
       const declared = (match?.[1] ?? '').replace(/[^\p{L}'-]/gu, '');
       if (declared.length < 2) return { intent, final: false, text: 'Como disseste que te chamas?' };
       const pretty = declared.charAt(0).toUpperCase() + declared.slice(1).toLowerCase();
-      return { intent, final: true, text: register(npc) === 'calao_luandense' ? `Fixe, ${pretty}! Eu sou ${npc.def.firstName}. Já não te esqueço, kamba.` : `Muito prazer, ${pretty}. Eu sou ${npc.def.firstName}, ${role}.`, memoryUpdate: { displayName: pretty } };
+      const intro = register(npc) === 'calao_luandense' ? `Fixe, ${pretty}! Eu sou ${npc.def.firstName}. Já não te esqueço, kamba.` : `Muito prazer, ${pretty}. Eu sou ${npc.def.firstName}, ${role}.`;
+      // pergunta composta ("chamo-me X. Onde fica…?") → responder também ao resto
+      const rest = text.slice((match.index ?? 0) + match[0].length).replace(/^[\s.,!;:-]+/, '');
+      const follow = rest.length > 3 ? localReply({ npc, text: rest, player, world, memory: { ...memory, facts: { ...memory?.facts, displayName: pretty } } }) : null;
+      const extra = follow && follow.intent !== 'desconhecido' && follow.intent !== 'nome_jogador' ? ` ${follow.text}` : '';
+      return { intent, final: true, text: `${intro}${extra}`, memoryUpdate: { displayName: pretty } };
     }
     case 'segredos':
       return { intent, final: true, text: 'Disso não sei nada nem posso falar. Sou só uma personagem do bairro — sem acesso a contas, senhas ou sistemas.' };
@@ -117,7 +118,7 @@ export function localReply({ npc, text, player, world, memory }) {
     case 'despedida':
       return { intent, final: false, text: register(npc) === 'calao_luandense' ? `Bazamos, ${name ?? 'kamba'}! Até já.` : `Até logo${name ? `, ${name}` : ''}!` };
     case 'saudacao':
-      return { intent, final: false, text: `${hello(npc, hour)} ${name ? `Como vai, ${name}? ` : ''}Em que posso ajudar ${you(npc)}?` };
+      return { intent, final: false, text: `${hello(npc, hour)} ${name ? `Como vai, ${name}? ` : ''}Em que posso ajudar?` };
     default:
       return { intent, final: false, text: npc.rng.pick([
         'Hmm, disso não sei bem. Posso indicar-te sítios no bairro ou explicar as corridas da Arena.',

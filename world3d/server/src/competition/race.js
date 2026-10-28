@@ -48,7 +48,8 @@ function segPointDist(ax, az, bx, bz, px, pz) {
 }
 
 export class RaceManager {
-  constructor({ store, ledger, traffic = null, npcSim = null, send = () => {}, now = () => Date.now(), config = {}, isOnline = () => true }) {
+  constructor({ store, ledger, traffic = null, npcSim = null, send = () => {}, now = () => Date.now(), config = {}, isOnline = () => true, onTeleport = () => {} }) {
+    this.onTeleport = onTeleport;
     this.store = store;
     this.ledger = ledger;
     this.traffic = traffic;
@@ -144,7 +145,11 @@ export class RaceManager {
       track: { id: RACE_TRACK.id, name: RACE_TRACK.name, checkpoints: RACE_TRACK.checkpoints, radius: RACE_TRACK.checkpointRadius, heading: RACE_TRACK.start.heading },
       participants: race.participants.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot, vehicle: p.vehicle, grid: p.grid })),
     };
-    for (const p of race.participants) if (!p.isBot) this.send(p.id, { ...setup, you: { grid: p.grid, vehicle: p.vehicle } });
+    for (const p of race.participants) {
+      if (p.isBot) continue;
+      this.onTeleport(p.id, p.grid[0], p.grid[1]);
+      this.send(p.id, { ...setup, you: { grid: p.grid, vehicle: p.vehicle } });
+    }
     return race;
   }
 

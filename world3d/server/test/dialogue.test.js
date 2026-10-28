@@ -112,3 +112,10 @@ test('direcções usam a posição real do jogador', async () => {
   const r = await g.talk({ npc: mkNpc(defs[9]), player: { id: 'u:10', x: 0, z: 0 }, text: 'onde fica a farmácia?', world });
   assert.match(r.text, /Farmácia Ngola.*\d+ m para (Norte|Nordeste|Este)/);
 });
+
+test('pergunta composta: nome + direcções na mesma frase', async () => {
+  const g = gateway();
+  const r = await g.talk({ npc: mkNpc(defs[10]), player: { id: 'u:11', x: 0, z: 0 }, text: 'Chamo-me Lukeny. Onde fica a farmácia?', world });
+  assert.match(r.text, /Lukeny/);
+  assert.match(r.text, /Farmácia Ngola/);
+});

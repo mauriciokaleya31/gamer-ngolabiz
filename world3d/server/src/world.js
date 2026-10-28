@@ -66,6 +66,7 @@ export class World {
       store, ledger: this.ledger, traffic: this.traffic, npcSim: this.npcSim, now,
       send: (pid, msg) => this.sendTo(pid, msg),
       isOnline: (pid) => this.players.has(pid),
+      onTeleport: (pid, x, z) => this.teleport(pid, x, z),
       config: { feePct: cfg.competitions.feePct },
     });
     this.players = new Map();
@@ -229,17 +230,34 @@ export class World {
     for (const o of this.players.values()) this.sendTo(o.id, { t: 'vehicles', vehicles: list });
   }
 
+  /** Teletransporte autoritativo (ex.: grelha de partida). O cliente segue a ordem. */
+  teleport(playerId, x, z) {
+    const p = this.players.get(playerId);
+    if (!p) return;
+    if (p.vehicleId) this.releaseVehicle(p);
+    p.x = x;
+    p.z = z;
+    p.lastStateAt = this.now();
+    p.pendingTeleport = { x, z, until: this.now() + 5000 };
+  }
+
   /** Estado enviado pelo cliente (movimento previsto localmente, validado aqui). */
   onState(p, m) {
     const now = this.now();
     const x = Number(m.x);
     const z = Number(m.z);
     if (!Number.isFinite(x) || !Number.isFinite(z)) return;
+    if (p.pendingTeleport) {
+      // ignorar amostras antigas até o cliente aplicar o teletransporte
+      if (now < p.pendingTeleport.until && Math.hypot(x - p.pendingTeleport.x, z - p.pendingTeleport.z) > 8) return;
+      p.pendingTeleport = null;
+      p.lastStateAt = now;
+    }
     const dt = Math.max(0.05, (now - p.lastStateAt) / 1000);
     const mode = p.inVehicle || m.veh ? (p.vehicle ?? m.veh ?? 'car') : 'foot';
     const limit = (MAX_SPEED[mode] ?? MAX_SPEED.car) * dt * 1.4 + 2.5;
     const inBounds = x >= ZONE_BOUNDS.minX - 2 && x <= ZONE_BOUNDS.maxX + 2 && z >= ZONE_BOUNDS.minZ - 2 && z <= ZONE_BOUNDS.maxZ + 2;
-    if (!inBounds || (Math.hypot(x - p.x, z - p.z) > limit && !m.teleportAck)) {
+    if (!inBounds || Math.hypot(x - p.x, z - p.z) > limit) {
       p.corrections = (p.corrections ?? 0) + 1;
       this.sendTo(p.id, { t: 'correct', x: p.x, z: p.z });
       p.lastStateAt = now;
@@ -311,6 +329,13 @@ export class World {
           const env = this.envMessage();
           for (const o of this.players.values()) this.sendTo(o.id, env);
           return;
+        }
+        case 'diag_teleport': {
+          if (!this.env.development) throw new RaceError('Diagnóstico desactivado.', 'forbidden');
+          const x = Math.max(ZONE_BOUNDS.minX + 1, Math.min(ZONE_BOUNDS.maxX - 1, Number(m.x) || 0));
+          const z = Math.max(ZONE_BOUNDS.minZ + 1, Math.min(ZONE_BOUNDS.maxZ - 1, Number(m.z) || 0));
+          this.teleport(p.id, x, z);
+          return this.sendTo(p.id, { t: 'correct', x, z, h: Number(m.h) || 0, diag: true });
         }
         case 'diag_weather': {
           if (!this.env.development) throw new RaceError('Diagnóstico desactivado.', 'forbidden');

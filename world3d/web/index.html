@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-AO">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Kianda Centro · NgolaBiz World 3D</title>
+  <meta name="description" content="Mundo aberto 3D do NgolaBiz Gamer — cliente web de pré-visualização.">
+  <link rel="stylesheet" href="css/world.css">
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three/three.module.min.js" } }
+  </script>
+</head>
+<body>
+  <canvas id="scene" tabindex="0"></canvas>
+
+  <!-- Etiquetas e balões projectados sobre personagens -->
+  <div id="tags" aria-hidden="true"></div>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div id="hud-top-left" class="panel glass">
+      <div class="zone-name">KIANDA CENTRO</div>
+      <div class="clock-row">
+        <span id="clock" class="clock">--:--</span>
+        <span class="tz">Luanda · WAT</span>
+      </div>
+      <div class="env-row"><span id="period">—</span> · <span id="weather">—</span></div>
+      <div id="diag-badge" class="badge warn hidden">TEMPO DE DIAGNÓSTICO</div>
+    </div>
+    <div id="hud-top-right" class="panel glass">
+      <div class="wallet-label">Saldo de demonstração</div>
+      <div id="wallet" class="wallet">— Kz demo</div>
+      <div class="wallet-note">Sem valor real · sem depósitos/levantamentos</div>
+    </div>
+    <div id="race-hud" class="panel glass hidden">
+      <div id="race-title">CORRIDA</div>
+      <div id="race-countdown" class="countdown hidden">5</div>
+      <div class="race-row"><span>Pontos de controlo</span><b id="race-cp">0/12</b></div>
+      <div class="race-row"><span>Tempo</span><b id="race-time">0:00.0</b></div>
+    </div>
+    <canvas id="minimap" width="200" height="200"></canvas>
+    <div id="prompt" class="prompt hidden"></div>
+    <div id="speedo" class="panel glass hidden"><b id="speed-val">0</b><span>km/h</span></div>
+    <div id="chat" class="glass">
+      <div id="chat-log"></div>
+      <input id="chat-input" maxlength="200" placeholder="Enter para falar com quem está perto…" autocomplete="off">
+    </div>
+    <div id="toasts"></div>
+    <div id="help" class="glass">
+      <b>WASD</b> mover · <b>Shift</b> correr · <b>Espaço</b> saltar · <b>E</b> falar/interagir · <b>F</b> conduzir · <b>Tab</b> menu · <b>Enter</b> chat · rato: câmara
+    </div>
+    <div id="preview-label">Cliente web de pré-visualização · modelos 3D provisórios · cliente de produção: Unreal Engine 5</div>
+  </div>
+
+  <!-- Diálogo com NPC -->
+  <div id="dialogue" class="panel glass hidden">
+    <div class="dlg-head">
+      <div>
+        <div id="dlg-name" class="dlg-name">—</div>
+        <div id="dlg-role" class="dlg-role">—</div>
+      </div>
+      <span class="badge ai">PERSONAGEM IA</span>
+      <button id="dlg-close" class="icon-btn" title="Fechar (Esc)">✕</button>
+    </div>
+    <div id="dlg-log" class="dlg-log"></div>
+    <div class="dlg-quick">
+      <button data-q="Olá! Quem és tu?">Quem és?</button>
+      <button data-q="Onde fica a Arena?">Onde fica a Arena?</button>
+      <button data-q="Como funcionam as corridas?">Competições</button>
+      <button data-q="Que horas são?">Horas</button>
+    </div>
+    <form id="dlg-form"><input id="dlg-input" maxlength="280" placeholder="Escreve uma pergunta…" autocomplete="off"><button>Enviar</button></form>
+  </div>
+
+  <!-- Menu principal -->
+  <div id="menu" class="panel glass hidden">
+    <div class="menu-tabs">
+      <button data-tab="perfil" class="active">Perfil</button>
+      <button data-tab="competicoes">Competições</button>
+      <button data-tab="social">Amigos e Grupo</button>
+      <button data-tab="ranking">Classificação</button>
+      <button data-tab="carteira">Carteira demo</button>
+      <button data-tab="definicoes">Definições</button>
+      <button data-tab="diagnostico" id="tab-diag" class="hidden">Diagnóstico</button>
+      <button id="menu-close" class="icon-btn" title="Fechar (Tab)">✕</button>
+    </div>
+    <div id="menu-body" class="menu-body"></div>
+  </div>
+
+  <!-- Perfil de outra personagem -->
+  <div id="profile" class="panel glass hidden"></div>
+
+  <!-- Desafio recebido -->
+  <div id="challenge-modal" class="panel glass hidden"></div>
+
+  <!-- Resultado de corrida -->
+  <div id="result-modal" class="panel glass hidden"></div>
+
+  <!-- Criador de personagem / entrada -->
+  <div id="creator" class="overlay">
+    <div class="creator-card glass">
+      <div class="creator-brand">
+        <div class="brand-title">NGOLABIZ <span>WORLD 3D</span></div>
+        <div class="brand-sub">Kianda Centro — primeira zona do universo NgolaBiz Gamer</div>
+      </div>
+      <div class="creator-grid">
+        <div id="creator-preview"></div>
+        <div class="creator-form">
+          <label>Nome no mundo <input id="cr-name" maxlength="18" placeholder="O teu nome"></label>
+          <div class="seg" id="cr-gender">
+            <button data-v="m" class="active">Masculino</button><button data-v="f">Feminino</button>
+          </div>
+          <div class="cr-row"><span>Tom de pele</span><div class="swatches" id="cr-skin"></div></div>
+          <div class="cr-row"><span>Rosto</span><div class="seg small" id="cr-face"><button data-v="0" class="active">1</button><button data-v="1">2</button><button data-v="2">3</button><button data-v="3">4</button></div></div>
+          <div class="cr-row"><span>Cabelo</span><select id="cr-hair"></select></div>
+          <div class="cr-row"><span>Cor do cabelo</span><div class="swatches" id="cr-haircolor"></div></div>
+          <div class="cr-row"><span>Parte de cima</span><select id="cr-top"></select></div>
+          <div class="cr-row"><span>Cor</span><div class="swatches" id="cr-topcolor"></div></div>
+          <div class="cr-row"><span>Padrão</span><div class="seg small" id="cr-pattern"><button data-v="liso" class="active">Liso</button><button data-v="riscas">Riscas</button><button data-v="capulana">Capulana</button></div></div>
+          <div class="cr-row"><span>Parte de baixo</span><select id="cr-bottom"></select></div>
+          <div class="cr-row"><span>Cor</span><div class="swatches" id="cr-bottomcolor"></div></div>
+          <div class="cr-row"><span>Acessório</span><select id="cr-acc"></select></div>
+          <div class="cr-row"><span>Altura</span><input type="range" id="cr-height" min="1.55" max="1.95" step="0.01" value="1.75"></div>
+          <div class="cr-row"><span>Qualidade gráfica</span><div class="seg small" id="cr-quality"><button data-v="baixa">Baixa</button><button data-v="media" class="active">Média</button><button data-v="alta">Alta</button></div></div>
+          <button id="cr-enter" class="primary">ENTRAR EM KIANDA CENTRO</button>
+          <div id="cr-status" class="cr-status">A ligar ao servidor do mundo…</div>
+        </div>
+      </div>
+      <div class="creator-foot">Os habitantes deste mundo são <b>personagens controladas por IA</b> e estão identificados como tal. Os saldos são de <b>demonstração</b> (sem dinheiro real).</div>
+    </div>
+  </div>
+
+  <div id="fatal" class="overlay hidden"><div class="glass fatal-card"><h2>Não foi possível iniciar</h2><p id="fatal-msg"></p></div></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
