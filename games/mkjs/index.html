@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mortal Kombat Arena - NgolaBiz</title>
+    <script src="src/movement.js"></script>
+    <script src="src/mk.js"></script>
+    <link rel="stylesheet" href="styles/styles.css" />
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: #000000 !important;
+            background-color: #000000 !important;
+            overflow: hidden;
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: Arial, sans-serif;
+        }
+        #game-wrapper {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000000 !important;
+            background-color: #000000 !important;
+            overflow: hidden;
+        }
+        #parent {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 600px;
+            height: 400px;
+            transform: translate(-50%, -50%) scale(1);
+            transform-origin: center center;
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.95);
+            border-radius: 6px;
+            background: #000000 !important;
+            background-color: #000000 !important;
+            overflow: hidden;
+        }
+        #arena {
+            width: 100%;
+            height: 100%;
+            background: #000000 !important;
+            background-color: #000000 !important;
+            position: absolute;
+            top: 0;
+            left: 0;
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.95);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        #arena canvas, #movementjs-main-canvas {
+            background-color: #000000 !important;
+        }
+        #utils {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            width: 100%;
+            z-index: 10;
+        }
+        
+        /* Indicadores Centrais de Melhores de 3 Rounds */
+        .mk-round-hud-center {
+            position: absolute;
+            top: 2px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 20;
+            pointer-events: none;
+        }
+        .mk-round-title-pill {
+            background: rgba(10, 10, 14, 0.88);
+            border: 1px solid #ef4444;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 900;
+            padding: 2px 10px;
+            border-radius: 10px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+        }
+        .mk-rounds-dots-container {
+            display: flex;
+            justify-content: space-between;
+            width: 180px;
+            margin-top: 4px;
+        }
+        .mk-player-round-dots {
+            display: flex;
+            gap: 6px;
+        }
+        .mk-round-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.18);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            transition: all 0.3s ease;
+        }
+        .mk-round-dot.won-p1 {
+            background: #ffffff;
+            border-color: #ffffff;
+            box-shadow: 0 0 8px #ffffff;
+        }
+        .mk-round-dot.won-p2 {
+            background: #ef4444;
+            border-color: #f87171;
+            box-shadow: 0 0 8px #ef4444;
+        }
+
+        /* Banner Central Flutuante para Anúncio de Rounds & KO */
+        #mk-announcement-overlay {
+            position: absolute;
+            top: 45%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.8);
+            z-index: 100;
+            pointer-events: none;
+            text-align: center;
+            opacity: 0;
+            transition: all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        #mk-announcement-overlay.active {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1.1);
+        }
+        .mk-announce-main-text {
+            font-family: Impact, "Arial Black", sans-serif;
+            font-size: 42px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #fff;
+            text-shadow: 0 0 20px #ef4444, 0 0 40px #dc2626, 2px 2px 0 #000;
+        }
+        .mk-announce-sub-text {
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: 3px;
+            color: #ffffff;
+            text-shadow: 0 0 8px rgba(0,0,0,0.8);
+            margin-top: 2px;
+        }
+    </style>
+
+    <script>
+    // Suporte a Mute Global da Arena
+    window.__is_arena_muted = (localStorage.getItem('arena_audio_muted') === 'true');
+    
+    // Intercepta criação de áudios para respeitar mute
+    const origAudioPlay = HTMLAudioElement.prototype.play;
+    HTMLAudioElement.prototype.play = function() {
+        if (window.__is_arena_muted) {
+            this.muted = true;
+            return Promise.resolve();
+        }
+        return origAudioPlay.apply(this, arguments);
+    };
+
+    window.addEventListener('message', function(e) {
+        if (e.data && e.data.type === 'arena_mute') {
+            window.__is_arena_muted = !!e.data.muted;
+            document.querySelectorAll('audio, video').forEach(function(el) {
+                try {
+                    el.muted = window.__is_arena_muted;
+                    if (window.__is_arena_muted) el.pause();
+                } catch(err) {}
+            });
+        }
+    });
+    </script>
+</head>
+<body>
+    <div id="game-wrapper">
+        <div id="parent">
+            <div id="utils">
+                <div id="player1Name" class="playerName">Sub-Zero</div>
+                <div id="player1LifeBar" class="lifebar"><div class="life" id="player1Life"></div></div>
+                <div id="player2Name" class="playerName">Kano</div>
+                <div id="player2LifeBar" class="lifebar"><div class="life" id="player2Life"></div></div>
+
+                <!-- HUD Central com Placar de 3 Rounds -->
+                <div class="mk-round-hud-center">
+                    <div class="mk-round-title-pill" id="mk-round-indicator">RODADA 1 / 3</div>
+                    <div class="mk-rounds-dots-container">
+                        <div class="mk-player-round-dots" id="mk-dots-p1" title="Vitórias do Jogador">
+                            <div class="mk-round-dot" id="p1-dot-1"></div>
+                            <div class="mk-round-dot" id="p1-dot-2"></div>
+                        </div>
+                        <div class="mk-player-round-dots" id="mk-dots-p2" title="Vitórias do Adversário">
+                            <div class="mk-round-dot" id="p2-dot-1"></div>
+                            <div class="mk-round-dot" id="p2-dot-2"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Banner Flutuante de Notificação de Round & Fim de Combate -->
+            <div id="mk-announcement-overlay">
+                <div class="mk-announce-main-text" id="mk-banner-title">RODADA 1</div>
+                <div class="mk-announce-sub-text" id="mk-banner-sub">LUTE!</div>
+            </div>
+
+            <div id="arena"></div>
+            <div id="loading">
+                <span class="loadingLabel">Carregando Arena...</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+
+            function $(id) {
+                return document.getElementById(id);
+            }
+
+            function setLife(container, life) {
+                if (container) container.style.width = Math.max(0, Math.min(100, life)) + '%';
+            }
+
+            // Responsividade e Escala Perfeita para Telas de Celular e Computador
+            // Responsividade e Escala Perfeita para Telas de Celular e Computador (Sem barras pretas no topo)
+            function fitArenaToScreen() {
+                var parent = document.getElementById("parent");
+                if (!parent) return;
+
+                var baseW = 600;
+                var baseH = 400;
+
+                var w = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth || 360;
+                var h = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight || 240;
+
+                var scaleX = w / baseW;
+                var scaleY = h / baseH;
+                var scale = Math.min(scaleX, scaleY);
+
+                if (w <= 768) {
+                    // No mobile, preencher a largura de forma limpa e ancorar no topo para remover a barra preta superior
+                    scale = Math.max(0.48, (w - 2) / baseW);
+                    parent.style.top = '0px';
+                    parent.style.left = '50%';
+                    parent.style.transformOrigin = 'top center';
+                    parent.style.transform = 'translateX(-50%) scale(' + scale + ')';
+                } else {
+                    scale = Math.max(0.50, Math.min(scale, 1.85));
+                    parent.style.top = '50%';
+                    parent.style.left = '50%';
+                    parent.style.transformOrigin = 'center center';
+                    parent.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
+                }
+            }
+            window.addEventListener('resize', fitArenaToScreen);
+            window.addEventListener('orientationchange', function() {
+                setTimeout(fitArenaToScreen, 150);
+                setTimeout(fitArenaToScreen, 400);
+            });
+            window.addEventListener('load', function() {
+                fitArenaToScreen();
+                setTimeout(fitArenaToScreen, 200);
+            });
+
+            // Tecla espaço desativada para scroll
+            document.onkeydown = function (e) {
+                if (e.keyCode === 32) {
+                    e.preventDefault();
+                }
+            };
+
+            (function () {
+                var urlParams = new URLSearchParams(window.location.search);
+                var p1Name = urlParams.get('user_name') || 'Sub-Zero';
+                var p2Name = urlParams.get('opp_name') || 'Kano';
+                var botWinrate = parseInt(urlParams.get('bot_winrate')) || 75;
+                var urlCombatStyle = urlParams.get('bot_style') || '';
+
+                // Lista de estilos de combate com técnicas bem distintas
+                var availableStyles = ['aggressive', 'defensive', 'tactical', 'ninja'];
+                var botCombatStyle = urlCombatStyle || availableStyles[Math.floor(Math.random() * availableStyles.length)];
+
+                if ($('player1Name')) $('player1Name').textContent = p1Name;
+                if ($('player2Name')) $('player2Name').textContent = p2Name;
+
+                // ==========================================
+                // SISTEMA OFICIAL DE 3 ROUNDS (MELHOR DE 3)
+                // ==========================================
+                var currentRound = 1;
+                var maxRounds = 3;
+                var winsNeeded = 2;
+                var p1RoundWins = 0;
+                var p2RoundWins = 0;
+                var isRoundOver = false;
+                var isMatchOver = false;
+                var isMatchStarted = false;
+                window.isCombatAllowed = function() {
+                    return isMatchStarted && !isRoundOver && !isMatchOver;
+                };
+                var currentP1Score = 0;
+                var currentP2Score = 0;
+                var gameInstanceRef = null;
+
+                function showAnnouncement(title, sub, durationMs, callback) {
+                    var overlay = $('mk-announcement-overlay');
+                    var tEl = $('mk-banner-title');
+                    var sEl = $('mk-banner-sub');
+                    if (!overlay || !tEl || !sEl) return;
+
+                    tEl.textContent = title;
+                    sEl.textContent = sub || '';
+                    overlay.classList.add('active');
+
+                    setTimeout(function() {
+                        overlay.classList.remove('active');
+                        if (typeof callback === 'function') callback();
+                    }, durationMs || 1500);
+                }
+
+                function updateRoundHUD() {
+                    var ind = $('mk-round-indicator');
+                    if (ind) {
+                        if (currentRound === 3) {
+                            ind.textContent = 'RODADA 3 (DECISIVA)';
+                            ind.style.borderColor = '#ef4444';
+                            ind.style.color = '#ef4444';
+                        } else {
+                            ind.textContent = 'RODADA ' + currentRound + ' / 3';
+                            ind.style.borderColor = '#ef4444';
+                            ind.style.color = '#ffffff';
+                        }
+                    }
+
+                    var p1d1 = $('p1-dot-1');
+                    var p1d2 = $('p1-dot-2');
+                    if (p1d1) p1d1.className = 'mk-round-dot' + (p1RoundWins >= 1 ? ' won-p1' : '');
+                    if (p1d2) p1d2.className = 'mk-round-dot' + (p1RoundWins >= 2 ? ' won-p1' : '');
+
+                    var p2d1 = $('p2-dot-1');
+                    var p2d2 = $('p2-dot-2');
+                    if (p2d1) p2d1.className = 'mk-round-dot' + (p2RoundWins >= 1 ? ' won-p2' : '');
+                    if (p2d2) p2d2.className = 'mk-round-dot' + (p2RoundWins >= 2 ? ' won-p2' : '');
+                }
+
+                function handleRoundEnded(winnerName) {
+                    if (isRoundOver || isMatchOver) return;
+                    isRoundOver = true;
+
+                    var isP1Winner = (winnerName === 'p1');
+                    if (isP1Winner) {
+                        p1RoundWins++;
+                    } else {
+                        p2RoundWins++;
+                    }
+                    updateRoundHUD();
+
+                    // Notificar o pai sobre o round concluído
+                    if (window.parent && window.parent !== window) {
+                        window.parent.postMessage({
+                            type: 'arena_round_win',
+                            winner: isP1Winner ? 'p1' : 'p2',
+                            current_round: currentRound,
+                            p1_round_wins: p1RoundWins,
+                            p2_round_wins: p2RoundWins
+                        }, '*');
+                    }
+
+                    var winnerDisplay = isP1Winner ? p1Name : p2Name;
+                    showAnnouncement('K.O.!', winnerDisplay + ' VENCEU A RODADA', 1800, function() {
+                        // Verificar se alguém ganhou a melhor de 3 ou se acabaram os rounds
+                        if (p1RoundWins >= winsNeeded || p2RoundWins >= winsNeeded || currentRound >= maxRounds) {
+                            isMatchOver = true;
+                            var finalResult = (p1RoundWins > p2RoundWins) ? 'win' : ((p2RoundWins > p1RoundWins) ? 'loss' : 'draw');
+                            var champName = (finalResult === 'win') ? p1Name : (finalResult === 'loss' ? p2Name : 'EMPATE');
+
+                            showAnnouncement(
+                                (finalResult === 'win' ? 'VITÓRIA!' : (finalResult === 'loss' ? 'DERROTA!' : 'EMPATE!')), 
+                                champName + ' VENCEU O DUELO!', 
+                                2200, 
+                                function() {
+                                    if (window.parent && window.parent !== window) {
+                                        window.parent.postMessage({
+                                            type: 'arena_finish',
+                                            result: finalResult,
+                                            myScore: currentP1Score + (finalResult === 'win' ? 500 : 0),
+                                            peerScore: currentP2Score + (finalResult === 'loss' ? 500 : 0),
+                                            p1_rounds: p1RoundWins,
+                                            p2_rounds: p2RoundWins
+                                        }, '*');
+                                    }
+                                }
+                            );
+                        } else {
+                            // Avançar para o próximo round
+                            currentRound++;
+                            updateRoundHUD();
+
+                            showAnnouncement('RODADA ' + currentRound, 'LUTE!', 1400, function() {
+                                resetFightersForNextRound();
+                            });
+                        }
+                    });
+                }
+
+                // ==============================================================
+                // REINICIALIZAÇÃO TOTAL DOS COMBATENTES (CORREÇÃO ROUND 2 E 3)
+                // ==============================================================
+                function reviveFighter(f, xPos, orient) {
+                    if (!f) return;
+                    try {
+                        // 1. Destravar completamente
+                        f.unlock();
+                        f._locked = false;
+
+                        // 2. Parar qualquer movimento ativo ou animação residual (WIN, FALL)
+                        if (f._currentMove && typeof f._currentMove.stop === 'function') {
+                            try { f._currentMove.stop(); } catch(e) {}
+                        }
+                        if (f.getMove() && typeof f.getMove().stop === 'function') {
+                            try { f.getMove().stop(); } catch(e) {}
+                        }
+
+                        // 3. Restaurar 100 de HP no motor
+                        f.setLife(100);
+
+                        // 4. Reposicionar no solo
+                        f.setX(xPos);
+                        f.setY(mk.config.PLAYER_TOP);
+                        f.setOrientation(orient);
+
+                        // 5. Reiniciar a postura padrão (STAND) do zero
+                        var standMove = f.moves[mk.moves.types.STAND];
+                        if (standMove) {
+                            standMove._currentStep = 0;
+                            standMove._counter = 0;
+                            f._currentMove = standMove;
+                            standMove.go(0);
+                        }
+                    } catch (err) {
+                        console.error('Erro ao reiniciar combatente:', err);
+                    }
+                }
+
+                function resetFightersForNextRound() {
+                    if (!gameInstanceRef || !gameInstanceRef.fighters || gameInstanceRef.fighters.length < 2) return;
+                    var p1 = gameInstanceRef.fighters[0];
+                    var bot = gameInstanceRef.fighters[1];
+
+                    // Reviver ambos os combatentes com animação e vida completas
+                    reviveFighter(p1, 70, mk.fighters.orientations.RIGHT);
+                    reviveFighter(bot, 470, mk.fighters.orientations.LEFT);
+
+                    // Restaurar barras de vida visualmente para 100%
+                    setLife($('player1Life'), 100);
+                    setLife($('player2Life'), 100);
+
+                    isRoundOver = false;
+
+                    // Reiniciar a IA com nova estratégia de combate
+                    startBotCombatAI(gameInstanceRef);
+                }
+
+                // Listener para eventos externos (Touch, Teclado, e Virada de Round do pai)
+                window.addEventListener('message', function (e) {
+                    if (!e.data) return;
+                    
+                    if (e.data.type === 'arena_resize') {
+                        fitArenaToScreen();
+                        setTimeout(fitArenaToScreen, 120);
+                        return;
+                    }
+
+                    if (e.data.type === 'arena_start_match') {
+                        fitArenaToScreen();
+                        try { window.focus(); } catch(err) {}
+                        if (!isMatchStarted) {
+                            isMatchStarted = true;
+                            startGame();
+                            if (gameInstanceRef) {
+                                startBotCombatAI(gameInstanceRef);
+                            }
+                        }
+                        return;
+                    }
+
+                    if (e.data.type === 'arena_stop') {
+                        isMatchOver = true;
+                        return;
+                    }
+
+                    // Sincronização de próximo round acionada pelo play.php
+                    if (e.data.type === 'arena_next_round') {
+                        var targetR = parseInt(e.data.round) || (currentRound + 1);
+                        if (targetR > currentRound) {
+                            currentRound = targetR;
+                            updateRoundHUD();
+                            showAnnouncement('RODADA ' + currentRound, 'LUTE!', 1200, function() {
+                                resetFightersForNextRound();
+                            });
+                        }
+                        return;
+                    }
+
+                    // Controles Touch virtuais mapeados para teclas
+                    if (e.data.type === 'virtual_key') {
+                        if (!isMatchStarted || isRoundOver || isMatchOver) return;
+                        var eventType = e.data.action === 'down' ? 'keydown' : 'keyup';
+                        var kCode = e.data.keyCode;
+                        
+                        var evt = document.createEvent('Event');
+                        evt.initEvent(eventType, true, true);
+                        evt.keyCode = kCode;
+                        evt.which = kCode;
+                        document.dispatchEvent(evt);
+                    }
+                });
+
+                var options = {
+                    arena: {
+                        container: document.getElementById('arena'),
+                        // Arena TOWER (The Pit / Shao Kahn Tower): 100% escura, céu noturno e vermelho, sem mármore branco
+                        arena: mk.arenas.types.TOWER
+                    },
+                    fighters: [{ name: 'Subzero' }, { name: 'Kano' }],
+                    callbacks: {
+                        attack: function (f, o, l) {
+                            if (isRoundOver || isMatchOver) return;
+
+                            var oLife = o.getLife();
+                            if (o.getName() === 'kano') {
+                                setLife($('player2Life'), oLife);
+                            } else {
+                                setLife($('player1Life'), oLife);
+                            }
+
+                            var p1Life = $('player1Life') ? parseFloat($('player1Life').style.width) || 100 : 100;
+                            var p2Life = $('player2Life') ? parseFloat($('player2Life').style.width) || 100 : 100;
+
+                            currentP1Score = Math.round(Math.max(0, (100 - p2Life) * 25 + (p1RoundWins * 400)));
+                            currentP2Score = Math.round(Math.max(0, (100 - p1Life) * 25 + (p2RoundWins * 400)));
+
+                            // Sincronizar placar e pontos em tempo real com a Arena
+                            if (window.parent && window.parent !== window) {
+                                window.parent.postMessage({
+                                    type: 'arena_score_update',
+                                    p1_score: currentP1Score,
+                                    p2_score: currentP2Score,
+                                    score: currentP1Score,
+                                    oppScore: currentP2Score
+                                }, '*');
+                            }
+
+                            // Verificação de K.O. do Round
+                            if (p2Life <= 0 && !isRoundOver) {
+                                handleRoundEnded('p1');
+                            } else if (p1Life <= 0 && !isRoundOver) {
+                                handleRoundEnded('p2');
+                            }
+                        }
+                    },
+                    gameType: 'basic'
+                };
+
+                // ==============================================================
+                // IA AVANÇADA DE COMBATE: 4 ARQUÉTIPOS E TÉCNICAS REAIS DE BATALHA
+                // ==============================================================
+                var botAIInterval = null;
+                var botStuckCounter = 0;
+                var botIsGuarding = false;
+
+                function startBotCombatAI(gameInstance) {
+                    if (botAIInterval) clearInterval(botAIInterval);
+                    if (!gameInstance || !gameInstance.fighters || gameInstance.fighters.length < 2) return;
+                    gameInstanceRef = gameInstance;
+                    var p1 = gameInstance.fighters[0];
+                    var bot = gameInstance.fighters[1];
+                    var m = mk.moves.types;
+
+                    botStuckCounter = 0;
+                    botIsGuarding = false;
+
+                    // Cadência tática adaptada ao estilo do bot
+                    var tickInterval = 280;
+                    if (botCombatStyle === 'aggressive') {
+                        tickInterval = 240;
+                    } else if (botCombatStyle === 'ninja') {
+                        tickInterval = 260;
+                    } else if (botCombatStyle === 'defensive') {
+                        tickInterval = 340;
+                    } else {
+                        tickInterval = 290;
+                    }
+
+                    botAIInterval = setInterval(function () {
+                        try {
+                            if (!isMatchStarted || isRoundOver || isMatchOver) return;
+                            if (!bot || !p1 || bot.getLife() <= 0 || p1.getLife() <= 0) return;
+
+                            var botMove = bot.getMove();
+                            var botMoveType = botMove ? botMove.type : '';
+
+                            // 1. Salvaguarda: aguardar término de animações de impacto
+                            if (botMoveType === m.ENDURE || 
+                                botMoveType === m.KNOCK_DOWN || 
+                                botMoveType === m.ATTRACTIVE_STAND_UP || 
+                                botMoveType === m.FALL) {
+                                botStuckCounter = 0;
+                                return;
+                            }
+
+                            // 2. Se estiver executando guarda temporária, aguarda
+                            if (botIsGuarding) return;
+
+                            // 3. Destravar se ficar preso indevidamente fora de pulos
+                            if (bot._locked && botMoveType !== m.FORWARD_JUMP && botMoveType !== m.BACKWARD_JUMP && botMoveType !== m.JUMP) {
+                                botStuckCounter++;
+                                if (botStuckCounter >= 5) {
+                                    bot.unlock();
+                                    bot.setY(mk.config.PLAYER_TOP);
+                                    bot.setMove(m.STAND);
+                                    botStuckCounter = 0;
+                                }
+                                return;
+                            } else {
+                                botStuckCounter = 0;
+                            }
+
+                            // 4. Distância e Orientação Relativa
+                            var botX = bot.getX();
+                            var p1X = p1.getX();
+                            var dist = Math.abs(botX - p1X);
+
+                            if (botX > p1X) {
+                                bot.setOrientation(mk.fighters.orientations.RIGHT);
+                            } else {
+                                bot.setOrientation(mk.fighters.orientations.LEFT);
+                            }
+
+                            var p1Move = p1.getMove() ? p1.getMove().type : '';
+                            var p1IsAttacking = (
+                                p1Move === m.HIGH_PUNCH || p1Move === m.LOW_PUNCH ||
+                                p1Move === m.HIGH_KICK || p1Move === m.LOW_KICK ||
+                                p1Move === m.UPPERCUT || p1Move === m.SPIN_KICK
+                            );
+
+                            var combatReach = 95;
+                            var botHp = bot.getLife();
+                            var p1Hp = p1.getLife();
+
+                            // ==============================================================
+                            // ARQUÉTIPO 1: AGRESSIVO (BRAWLER / RUSHDOWN)
+                            // Avança com pulos ofensivos e desfere socos pesados e uppercuts
+                            // ==============================================================
+                            if (botCombatStyle === 'aggressive') {
+                                if (dist > combatReach) {
+                                    if (dist > 180 && Math.random() < 0.35) {
+                                        if (botMoveType === m.STAND || botMoveType === m.WALK) {
+                                            bot.setMove(m.FORWARD_JUMP);
+                                        }
+                                    } else {
+                                        if (botMoveType !== m.WALK) bot.setMove(m.WALK);
+                                    }
+                                } else {
+                                    var aggroCombos = [
+                                        m.UPPERCUT, 
+                                        m.HIGH_PUNCH, 
+                                        m.SPIN_KICK, 
+                                        m.HIGH_KICK, 
+                                        m.UPPERCUT, 
+                                        m.LOW_PUNCH
+                                    ];
+                                    var pick = aggroCombos[Math.floor(Math.random() * aggroCombos.length)];
+                                    bot.setMove(pick);
+                                }
+                                return;
+                            }
+
+                            // ==============================================================
+                            // ARQUÉTIPO 2: NINJA DAS SOMBRAS (ACROBATA & AGILIDADE)
+                            // Rasteiras baixas, chutes giratórios, recuo tático e saltos
+                            // ==============================================================
+                            if (botCombatStyle === 'ninja') {
+                                if (dist > combatReach) {
+                                    var ninjaApproach = Math.random();
+                                    if (dist > 200 && ninjaApproach < 0.38) {
+                                        bot.setMove(m.FORWARD_JUMP);
+                                    } else if (ninjaApproach < 0.15) {
+                                        bot.setMove(m.BACKWARD_JUMP);
+                                    } else {
+                                        if (botMoveType !== m.WALK) bot.setMove(m.WALK);
+                                    }
+                                } else {
+                                    var roll = Math.random();
+                                    if (roll < 0.32) {
+                                        bot.setMove(m.SQUAT_LOW_KICK); // Rasteira baixa ágil
+                                    } else if (roll < 0.58) {
+                                        bot.setMove(m.SPIN_KICK); // Chute giratório
+                                    } else if (roll < 0.80) {
+                                        bot.setMove(m.HIGH_KICK); // Chute alto
+                                    } else {
+                                        bot.setMove(m.WALK_BACKWARD); // Esquiva rápida
+                                        setTimeout(function() {
+                                            if (!isRoundOver && bot && bot.getLife() > 0 && bot.getMove().type === m.WALK_BACKWARD) {
+                                                bot.setMove(m.STAND);
+                                            }
+                                        }, 250);
+                                    }
+                                }
+                                return;
+                            }
+
+                            // ==============================================================
+                            // ARQUÉTIPO 3: DEFENSIVO (MESTRE DA GUARDA & CONTRA-ATAQUE)
+                            // Bloqueia ataques do jogador e responde com uppercut devastador
+                            // ==============================================================
+                            if (botCombatStyle === 'defensive') {
+                                if (dist <= (combatReach + 25) && p1IsAttacking) {
+                                    botIsGuarding = true;
+                                    bot.setMove(m.BLOCK);
+                                    setTimeout(function () {
+                                        botIsGuarding = false;
+                                        if (!isRoundOver && bot && bot.getLife() > 0) {
+                                            bot.unlock();
+                                            var counterMove = (Math.random() < 0.65) ? m.UPPERCUT : m.SPIN_KICK;
+                                            bot.setMove(counterMove);
+                                        }
+                                    }, 300);
+                                    return;
+                                }
+
+                                if (dist > combatReach) {
+                                    if (Math.random() < 0.70) {
+                                        if (botMoveType !== m.WALK) bot.setMove(m.WALK);
+                                    } else {
+                                        if (botMoveType !== m.STAND) bot.setMove(m.STAND);
+                                    }
+                                } else {
+                                    if (Math.random() < 0.45) {
+                                        botIsGuarding = true;
+                                        bot.setMove(m.BLOCK);
+                                        setTimeout(function() {
+                                            botIsGuarding = false;
+                                            if (!isRoundOver && bot && bot.getLife() > 0) {
+                                                bot.unlock();
+                                                bot.setMove(m.UPPERCUT);
+                                            }
+                                        }, 260);
+                                    } else {
+                                        var defStrikes = [m.UPPERCUT, m.LOW_KICK, m.HIGH_KICK, m.SQUAT_LOW_PUNCH];
+                                        bot.setMove(defStrikes[Math.floor(Math.random() * defStrikes.length)]);
+                                    }
+                                }
+                                return;
+                            }
+
+                            // ==============================================================
+                            // ARQUÉTIPO 4: TÁTICO & COMBOS MISTOS (MIXUP / ADAPTATIVO)
+                            // Alterna níveis alto/baixo e entra em fúria se estiver perdendo
+                            // ==============================================================
+                            var isDesperate = (botHp < 45 && p1Hp > botHp);
+
+                            if (dist > combatReach) {
+                                if (isDesperate && Math.random() < 0.40) {
+                                    bot.setMove(m.FORWARD_JUMP);
+                                } else {
+                                    if (botMoveType !== m.WALK) bot.setMove(m.WALK);
+                                }
+                            } else {
+                                var mixRoll = Math.random();
+                                if (mixRoll < 0.28) {
+                                    bot.setMove(m.SQUAT_LOW_KICK); // Quebra de guarda
+                                } else if (mixRoll < 0.52) {
+                                    bot.setMove(m.HIGH_PUNCH); // Soco alto
+                                } else if (mixRoll < 0.75) {
+                                    bot.setMove(m.UPPERCUT); // Gancho
+                                } else if (mixRoll < 0.90) {
+                                    bot.setMove(m.SPIN_KICK); // Giratória
+                                } else {
+                                    bot.setMove(m.WALK_BACKWARD);
+                                    setTimeout(function() {
+                                        if (!isRoundOver && bot && bot.getLife() > 0 && bot.getMove().type === m.WALK_BACKWARD) {
+                                            bot.setMove(m.STAND);
+                                        }
+                                    }, 200);
+                                }
+                            }
+                        } catch (err) {
+                            try {
+                                if (bot && !isRoundOver) {
+                                    bot.unlock();
+                                    bot.setY(mk.config.PLAYER_TOP);
+                                }
+                            } catch (e2) {}
+                        }
+                    }, tickInterval);
+                }
+
+                var startGame = function () {
+                    $('loading').style.visibility = 'hidden';
+                    $('arena').style.visibility = 'visible';
+                    $('utils').style.visibility = 'visible';
+                    fitArenaToScreen();
+                    updateRoundHUD();
+                    showAnnouncement('RODADA 1', 'LUTE!', 1400);
+                };
+
+                function startNewGame() {
+                    mk.start(options).ready(function () {
+                        gameInstanceRef = mk.game;
+                        $('loading').style.visibility = 'hidden';
+                        $('arena').style.visibility = 'visible';
+                        $('utils').style.visibility = 'visible';
+                        fitArenaToScreen();
+                        updateRoundHUD();
+                        
+                        // Se estiver rodando fora da arena (standalone direto), inicia de imediato
+                        if (!window.parent || window.parent === window) {
+                            isMatchStarted = true;
+                            startGame();
+                            if (mk.game) {
+                                startBotCombatAI(mk.game);
+                            }
+                        } else {
+                            // Dentro da Arena NgolaBiz: aguardar o botão 'Estou Pronto' ser acionado!
+                            showAnnouncement('PREPARE-SE', 'AGUARDANDO INÍCIO...', 2000);
+                        }
+                    });
+                }
+                
+                startNewGame();
+                fitArenaToScreen();
+                
+            }());
+
+        }());
+    </script>
+<script src="../../assets/js/arena-bridge.js"></script>
+</body>
+</html>

@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Duelo de Cartas 3D 1v1 — Casino56 Arena</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --bg-main: #07090e;
+            --surface-card: #141923;
+            --border-glow: #283142;
+            --red-arena: #F0444A;
+            --green-win: #22C98B;
+            --gold-accent: #F59E0B;
+            --purple-cyber: #a855f7;
+            --cyan-glow: #06b6d4;
+            --text-main: #F5F7FA;
+            --text-dim: #9AA4B2;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: var(--bg-main);
+            color: var(--text-main);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Canvas de Fundo Cyberpunk com Partículas 3D */
+        #bg-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+            opacity: 0.75;
+        }
+
+        /* Top HUD */
+        .hud-top {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 14px;
+            background: rgba(16, 20, 28, 0.92);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+        }
+
+        .player-hud {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .avatar-wrap {
+            position: relative;
+            width: 44px;
+            height: 44px;
+        }
+
+        .player-avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--purple-cyber);
+            box-shadow: 0 0 12px rgba(168, 85, 247, 0.5);
+        }
+        .player-avatar.opp {
+            border-color: var(--red-arena);
+            box-shadow: 0 0 12px rgba(240, 68, 74, 0.5);
+        }
+
+        .avatar-badge-live {
+            position: absolute;
+            bottom: -2px;
+            right: -2px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--green-win);
+            border: 2px solid #090B10;
+        }
+
+        .player-info { display: flex; flex-direction: column; }
+        .player-name { font-weight: 800; font-size: 0.84rem; color: #fff; letter-spacing: 0.3px; }
+        
+        .hp-bar-outer {
+            width: 110px;
+            height: 8px;
+            background: rgba(0,0,0,0.6);
+            border: 1px solid #283142;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 4px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.8);
+        }
+        .hp-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #22C98B, #10b981);
+            transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 0 8px rgba(34, 201, 139, 0.8);
+        }
+        .hp-bar-fill.danger {
+            background: linear-gradient(90deg, #F0444A, #ef4444);
+            box-shadow: 0 0 8px rgba(240, 68, 74, 0.8);
+        }
+
+        .round-counter-pod {
+            text-align: center;
+            background: linear-gradient(180deg, #18202d, #111622);
+            padding: 4px 14px;
+            border-radius: 20px;
+            border: 1px solid #2e384d;
+            box-shadow: 0 0 15px rgba(0,0,0,0.4);
+        }
+        .round-txt { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; font-weight: 700; letter-spacing: 1px; }
+        .round-score { font-size: 1.15rem; font-weight: 900; color: var(--gold-accent); letter-spacing: 1px; }
+
+        /* Arena 3D Stage */
+        .arena-container {
+            flex: 1;
+            position: relative;
+            z-index: 5;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            perspective: 1000px;
+            padding: 10px;
+            overflow: hidden;
+        }
+
+        /* Mesa Holográfica 3D Inclinada */
+        .holo-table-3d {
+            position: absolute;
+            top: 45%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotateX(40deg);
+            width: 90%;
+            max-width: 680px;
+            height: 320px;
+            border-radius: 40px;
+            background: radial-gradient(ellipse at center, rgba(168, 85, 247, 0.15) 0%, rgba(15, 23, 42, 0.6) 70%, transparent 100%);
+            border: 2px solid rgba(168, 85, 247, 0.35);
+            box-shadow: 0 0 50px rgba(168, 85, 247, 0.25), inset 0 0 40px rgba(168, 85, 247, 0.15);
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .holo-grid-lines {
+            width: 80%;
+            height: 80%;
+            border-radius: 20px;
+            border: 1px dashed rgba(6, 182, 212, 0.3);
+            background: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+
+        /* Oponente: Cartas Ocultas */
+        .opp-hand-tray {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 4px;
+            z-index: 6;
+        }
+        .card-mini-back {
+            width: 48px;
+            height: 68px;
+            border-radius: 8px;
+            background: linear-gradient(145deg, #1e2533, #0f131d);
+            border: 1.5px solid var(--red-arena);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--red-arena);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+            font-size: 1rem;
+            transform: translateY(0);
+            transition: transform 0.3s;
+        }
+
+        /* Zona de Confronto 3D (Cartas em Duelo) */
+        .clash-stage {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            width: 100%;
+            min-height: 180px;
+            z-index: 8;
+            position: relative;
+        }
+
+        .clash-slot {
+            width: 110px;
+            height: 160px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            perspective: 800px;
+        }
+
+        .vs-pulse-badge {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #F0444A, #991b1b);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            font-weight: 900;
+            color: #fff;
+            letter-spacing: 1px;
+            box-shadow: 0 0 20px rgba(240, 68, 74, 0.7);
+            border: 2px solid #fff;
+            animation: vsHeartbeat 1.5s infinite;
+        }
+        @keyframes vsHeartbeat {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 15px rgba(240, 68, 74, 0.6); }
+            50% { transform: scale(1.12); box-shadow: 0 0 28px rgba(240, 68, 74, 0.9); }
+        }
+
+        /* ESTRUTURA DA CARTA 3D COM FLIP */
+        .card-3d-wrapper {
+            width: 105px;
+            height: 152px;
+            perspective: 1000px;
+            cursor: pointer;
+            transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .card-3d-wrapper:hover {
+            transform: translateY(-8px) scale(1.05);
+        }
+        .card-3d-wrapper:active {
+            transform: translateY(-2px) scale(1.02);
+        }
+
+        .card-3d-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        }
+
+        .card-3d-inner.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 8px;
+            border: 2px solid rgba(255,255,255,0.15);
+        }
+
+        .card-face-front {
+            background: linear-gradient(145deg, #181f2c, #0e121a);
+        }
+        .card-face-front::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 45%;
+            background: linear-gradient(180deg, rgba(255,255,255,0.08), transparent);
+            pointer-events: none;
+        }
+
+        .card-face-back {
+            background: linear-gradient(145deg, #2a111a, #11090d);
+            border-color: var(--red-arena);
+            transform: rotateY(180deg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--red-arena);
+            font-size: 2rem;
+            box-shadow: inset 0 0 20px rgba(240, 68, 74, 0.3);
+        }
+
+        /* Conteúdo Interno da Carta */
+        .card-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 2;
+        }
+        .card-type-icon { font-size: 0.8rem; }
+        .card-atk-pill {
+            background: var(--purple-cyber);
+            color: #fff;
+            padding: 2px 6px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            font-weight: 900;
+            box-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
+        }
+        .card-atk-pill.opp {
+            background: var(--red-arena);
+            box-shadow: 0 0 8px rgba(240, 68, 74, 0.6);
+        }
+
+        .card-art-box {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.3rem;
+            z-index: 2;
+            filter: drop-shadow(0 0 8px currentColor);
+            transition: transform 0.2s;
+        }
+        .card-3d-wrapper:hover .card-art-box {
+            transform: scale(1.1);
+        }
+
+        .card-title-txt {
+            font-size: 0.72rem;
+            font-weight: 800;
+            color: #fff;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            z-index: 2;
+        }
+
+        .card-footer-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.62rem;
+            font-weight: 700;
+            color: var(--text-dim);
+            border-top: 1px solid rgba(255,255,255,0.08);
+            padding-top: 3px;
+            z-index: 2;
+        }
+
+        /* Banner de Status de Ronda */
+        .round-status-box {
+            min-height: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.95rem;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+            z-index: 10;
+        }
+
+        /* Bandeja de Cartas do Jogador (Bottom Tray) */
+        .player-hand-section {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            background: rgba(14, 18, 25, 0.96);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            backdrop-filter: blur(12px);
+        }
+
+        .hand-banner-tip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.78rem;
+            font-weight: 800;
+            color: var(--gold-accent);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .cards-row-scroll {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            max-width: 600px;
+            overflow-x: auto;
+            padding: 4px 0;
+            scrollbar-width: none;
+        }
+        .cards-row-scroll::-webkit-scrollbar { display: none; }
+
+        /* Botão Tátil 3D */
+        .btn-tactile-3d {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 24px;
+            background: linear-gradient(180deg, #F0444A, #C92E38);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            cursor: pointer;
+            box-shadow: 0 5px 0 #991b1b, 0 10px 20px rgba(240, 68, 74, 0.4);
+            transition: all 0.15s ease;
+        }
+        .btn-tactile-3d:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #991b1b, 0 4px 10px rgba(240, 68, 74, 0.4);
+        }
+        .btn-tactile-3d.green {
+            background: linear-gradient(180deg, #22C98B, #10b981);
+            box-shadow: 0 5px 0 #065f46, 0 10px 20px rgba(34, 201, 139, 0.4);
+        }
+        .btn-tactile-3d.green:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #065f46, 0 4px 10px rgba(34, 201, 139, 0.4);
+        }
+
+        /* Efeito de Dano Flutuante 3D */
+        .floating-damage {
+            position: absolute;
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: #fff;
+            pointer-events: none;
+            z-index: 40;
+            animation: floatUpFade 1s forwards ease-out;
+        }
+        @keyframes floatUpFade {
+            0% { transform: translateY(0) scale(0.8); opacity: 1; }
+            50% { transform: translateY(-30px) scale(1.2); opacity: 1; }
+            100% { transform: translateY(-60px) scale(1); opacity: 0; }
+        }
+
+        /* Overlay Final de Partida */
+        .result-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(7, 9, 14, 0.94);
+            backdrop-filter: blur(10px);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 60;
+            padding: 24px;
+            text-align: center;
+        }
+        .result-crown {
+            font-size: 3.5rem;
+            color: var(--gold-accent);
+            margin-bottom: 8px;
+            animation: bounceIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .result-headline {
+            font-size: 2.2rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+        }
+        .result-headline.win {
+            color: var(--green-win);
+            text-shadow: 0 0 25px rgba(34, 201, 139, 0.6);
+        }
+        .result-headline.loss {
+            color: var(--red-arena);
+            text-shadow: 0 0 25px rgba(240, 68, 74, 0.6);
+        }
+        .result-sub {
+            font-size: 0.95rem;
+            color: var(--text-dim);
+            max-width: 420px;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        @keyframes bounceIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            70% { transform: scale(1.15); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Responsividade para Ecrãs Pequenos (Mobile) */
+        @media (max-width: 480px) {
+            .hud-top { padding: 6px 10px; }
+            .player-avatar { width: 38px; height: 38px; }
+            .hp-bar-outer { width: 85px; height: 7px; }
+            .card-3d-wrapper { width: 85px; height: 125px; }
+            .clash-slot { width: 90px; height: 130px; }
+            .card-art-box { font-size: 1.8rem; }
+            .card-title-txt { font-size: 0.65rem; }
+            .card-mini-back { width: 40px; height: 56px; font-size: 0.85rem; }
+            .vs-pulse-badge { width: 38px; height: 38px; font-size: 0.95rem; }
+            .cards-row-scroll { gap: 6px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Canvas de Partículas 3D -->
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- Top HUD -->
+    <header class="hud-top">
+        <div class="player-hud">
+            <div class="avatar-wrap">
+                <img src="" id="p1-avatar" class="player-avatar" alt="Você">
+                <div class="avatar-badge-live"></div>
+            </div>
+            <div class="player-info">
+                <span class="player-name" id="p1-name">Você</span>
+                <div class="hp-bar-outer"><div class="hp-bar-fill" id="p1-hp" style="width: 100%;"></div></div>
+            </div>
+        </div>
+
+        <div class="round-counter-pod">
+            <div class="round-txt">Ronda <span id="cur-round">1</span> / 3</div>
+            <div class="round-score"><span id="p1-score">0</span> - <span id="p2-score">0</span></div>
+        </div>
+
+        <div class="player-hud" style="flex-direction: row-reverse; text-align: right;">
+            <div class="avatar-wrap">
+                <img src="" id="p2-avatar" class="player-avatar opp" alt="Oponente">
+                <div class="avatar-badge-live" style="background: var(--red-arena);"></div>
+            </div>
+            <div class="player-info">
+                <span class="player-name" id="p2-name">Oponente</span>
+                <div class="hp-bar-outer"><div class="hp-bar-fill" id="p2-hp" style="width: 100%;"></div></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Arena 3D Container -->
+    <main class="arena-container" id="arena-main">
+        <!-- Mesa Holográfica Inclinada -->
+        <div class="holo-table-3d">
+            <div class="holo-grid-lines"></div>
+        </div>
+
+        <!-- Mão Fechada do Oponente -->
+        <div class="opp-hand-tray" id="opp-hand-backs">
+            <div class="card-mini-back"><i class="fa-solid fa-shield-halved"></i></div>
+            <div class="card-mini-back"><i class="fa-solid fa-shield-halved"></i></div>
+            <div class="card-mini-back"><i class="fa-solid fa-shield-halved"></i></div>
+            <div class="card-mini-back"><i class="fa-solid fa-shield-halved"></i></div>
+        </div>
+
+        <!-- Zona de Confronto 3D -->
+        <div class="clash-stage">
+            <div class="clash-slot" id="p1-played-slot"></div>
+            <div class="vs-pulse-badge">VS</div>
+            <div class="clash-slot" id="p2-played-slot"></div>
+        </div>
+
+        <!-- Banner de Status de Ronda -->
+        <div class="round-status-box" id="round-feedback"></div>
+    </main>
+
+    <!-- Mão do Jogador (Bottom Tray) -->
+    <footer class="player-hand-section">
+        <div class="hand-banner-tip" id="turn-banner">
+            <i class="fa-solid fa-hand-pointer"></i> Escolhe a tua carta de ataque
+        </div>
+        <div class="cards-row-scroll" id="player-hand"></div>
+    </footer>
+
+    <!-- Overlay Final de Partida -->
+    <div class="result-overlay" id="result-overlay">
+        <div class="result-crown" id="res-icon"><i class="fa-solid fa-trophy"></i></div>
+        <div class="result-headline" id="res-title">VITÓRIA!</div>
+        <p class="result-sub" id="res-desc">Dominaste o confronto e asseguraste a recompensa!</p>
+        <button type="button" class="btn-tactile-3d green" onclick="restartMatch()">
+            <i class="fa-solid fa-rotate-right"></i> Jogar Novamente
+        </button>
+    </div>
+
+    <script>
+        // Parâmetros de URL vindos da Arena
+        const urlParams = new URLSearchParams(window.location.search);
+        const myName = urlParams.get('user_name') || 'Jogador';
+        const myAvatar = urlParams.get('user_avatar') || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
+        const oppName = urlParams.get('opp_name') || 'Combatente';
+        const oppAvatar = urlParams.get('opp_avatar') || 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?auto=format&fit=crop&w=150&q=80';
+
+        document.getElementById('p1-name').innerText = myName;
+        document.getElementById('p1-avatar').src = myAvatar;
+        document.getElementById('p2-name').innerText = oppName;
+        document.getElementById('p2-avatar').src = oppAvatar;
+
+        // Fundo com Partículas 3D Leve em Canvas
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let particles = [];
+
+        function resizeCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            particles = [];
+            for (let i = 0; i < 45; i++) {
+                particles.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    z: Math.random() * 0.8 + 0.2,
+                    vx: (Math.random() - 0.5) * 0.4,
+                    vy: (Math.random() - 0.5) * 0.4,
+                    size: Math.random() * 2.5 + 1,
+                    color: Math.random() > 0.5 ? '#a855f7' : '#06b6d4'
+                });
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function animateBg() {
+            ctx.clearRect(0, 0, width, height);
+            for (let p of particles) {
+                p.x += p.vx * p.z;
+                p.y += p.vy * p.z;
+                if (p.x < 0) p.x = width;
+                if (p.x > width) p.x = 0;
+                if (p.y < 0) p.y = height;
+                if (p.y > height) p.y = 0;
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size * p.z, 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = p.color;
+                ctx.fill();
+            }
+            requestAnimationFrame(animateBg);
+        }
+        animateBg();
+
+        // Sintetizador de Áudio Nativo Web Audio API
+        const AudioKit = (() => {
+            let ctx = null;
+            function getCtx() {
+                if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+                if (ctx.state === 'suspended') ctx.resume();
+                return ctx;
+            }
+
+            return {
+                cardPick: () => {
+                    try {
+                        const c = getCtx();
+                        const osc = c.createOscillator();
+                        const g = c.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(400, c.currentTime);
+                        osc.frequency.exponentialRampToValueAtTime(800, c.currentTime + 0.08);
+                        g.gain.setValueAtTime(0.12, c.currentTime);
+                        g.gain.exponentialRampToValueAtTime(0.01, c.currentTime + 0.08);
+                        osc.connect(g);
+                        g.connect(c.destination);
+                        osc.start();
+                        osc.stop(c.currentTime + 0.08);
+                    } catch(e){}
+                },
+                clashImpact: (won) => {
+                    try {
+                        const c = getCtx();
+                        const osc = c.createOscillator();
+                        const g = c.createGain();
+                        osc.type = won ? 'triangle' : 'sawtooth';
+                        osc.frequency.setValueAtTime(won ? 520 : 180, c.currentTime);
+                        osc.frequency.exponentialRampToValueAtTime(won ? 880 : 90, c.currentTime + 0.3);
+                        g.gain.setValueAtTime(0.2, c.currentTime);
+                        g.gain.exponentialRampToValueAtTime(0.01, c.currentTime + 0.3);
+                        osc.connect(g);
+                        g.connect(c.destination);
+                        osc.start();
+                        osc.stop(c.currentTime + 0.3);
+                    } catch(e){}
+                },
+                fanfare: (won) => {
+                    try {
+                        const c = getCtx();
+                        const notes = won ? [523.25, 659.25, 783.99, 1046.50] : [261.63, 233.08, 207.65, 174.61];
+                        notes.forEach((freq, i) => {
+                            setTimeout(() => {
+                                const osc = c.createOscillator();
+                                const g = c.createGain();
+                                osc.type = 'sine';
+                                osc.frequency.value = freq;
+                                g.gain.setValueAtTime(0.18, c.currentTime);
+                                g.gain.exponentialRampToValueAtTime(0.01, c.currentTime + 0.35);
+                                osc.connect(g);
+                                g.connect(c.destination);
+                                osc.start();
+                                osc.stop(c.currentTime + 0.35);
+                            }, i * 120);
+                        });
+                    } catch(e){}
+                }
+            };
+        })();
+
+        // Baralho Épico Casino56 Arena
+        const CARDS_POOL = [
+            { id: 1, name: 'Palanca Negra', power: 92, def: 65, icon: 'fa-shield-cat', color: '#a855f7' },
+            { id: 2, name: 'Rainha Nzinga', power: 98, def: 80, icon: 'fa-crown', color: '#f59e0b' },
+            { id: 3, name: 'Guerreiro Kimbundu', power: 84, def: 88, icon: 'fa-shield-halved', color: '#3b82f6' },
+            { id: 4, name: 'Chama de Luanda', power: 89, def: 55, icon: 'fa-fire-flame-curved', color: '#ef4444' },
+            { id: 5, name: 'Lenda do Kwanza', power: 95, def: 85, icon: 'fa-coins', color: '#22c98b' },
+            { id: 6, name: 'Espírito do Huambo', power: 78, def: 94, icon: 'fa-wind', color: '#06b6d4' },
+            { id: 7, name: 'Golpe Tático', power: 86, def: 70, icon: 'fa-bolt', color: '#ec4899' },
+            { id: 8, name: 'Guardião Benguela', power: 82, def: 90, icon: 'fa-mountain', color: '#eab308' }
+        ];
+
+        let p1Health = 100;
+        let p2Health = 100;
+        let curRound = 1;
+        let p1Score = 0;
+        let p2Score = 0;
+        let p1Hand = [];
+        let p2Hand = [];
+        let canPlay = true;
+
+        function dealCards() {
+            const shuffled = [...CARDS_POOL].sort(() => 0.5 - Math.random());
+            p1Hand = shuffled.slice(0, 4);
+            p2Hand = [...CARDS_POOL].sort(() => 0.5 - Math.random()).slice(0, 4);
+            renderHand();
+            updateOppBacks();
+        }
+
+        function updateOppBacks() {
+            const container = document.getElementById('opp-hand-backs');
+            container.innerHTML = '';
+            for (let i = 0; i < p2Hand.length; i++) {
+                const b = document.createElement('div');
+                b.className = 'card-mini-back';
+                b.innerHTML = '<i class="fa-solid fa-shield-halved"></i>';
+                container.appendChild(b);
+            }
+        }
+
+        function renderHand() {
+            const container = document.getElementById('player-hand');
+            container.innerHTML = '';
+            p1Hand.forEach((card, idx) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'card-3d-wrapper';
+                wrapper.innerHTML = `
+                    <div class="card-3d-inner">
+                        <div class="card-face card-face-front" style="border-color:${card.color};">
+                            <div class="card-header-row">
+                                <i class="fa-solid ${card.icon} card-type-icon" style="color:${card.color};"></i>
+                                <span class="card-atk-pill" style="background:${card.color};">${card.power}</span>
+                            </div>
+                            <div class="card-art-box" style="color:${card.color};">
+                                <i class="fa-solid ${card.icon}"></i>
+                            </div>
+                            <div class="card-title-txt">${card.name}</div>
+                            <div class="card-footer-stats">
+                                <span>ATK ${card.power}</span>
+                                <span>DEF ${card.def}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                wrapper.onclick = () => playCard(idx);
+                container.appendChild(wrapper);
+            });
+        }
+
+        function triggerDamageFloat(text, color, targetSlot) {
+            const rect = targetSlot.getBoundingClientRect();
+            const el = document.createElement('div');
+            el.className = 'floating-damage';
+            el.innerText = text;
+            el.style.color = color;
+            el.style.left = (rect.left + rect.width / 2 - 40) + 'px';
+            el.style.top = (rect.top + 20) + 'px';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 1000);
+        }
+
+        function playCard(index) {
+            if (!canPlay) return;
+            canPlay = false;
+
+            const myCard = p1Hand.splice(index, 1)[0];
+            renderHand();
+            AudioKit.cardPick();
+
+            // Oponente joga carta
+            const oppIdx = Math.floor(Math.random() * p2Hand.length);
+            const oppCard = p2Hand.splice(oppIdx, 1)[0];
+            updateOppBacks();
+
+            const slot1 = document.getElementById('p1-played-slot');
+            const slot2 = document.getElementById('p2-played-slot');
+
+            // Renderizar carta do Jogador (frente)
+            slot1.innerHTML = `
+                <div class="card-3d-wrapper" style="cursor:default;">
+                    <div class="card-3d-inner">
+                        <div class="card-face card-face-front" style="border-color:${myCard.color};">
+                            <div class="card-header-row">
+                                <i class="fa-solid ${myCard.icon} card-type-icon" style="color:${myCard.color};"></i>
+                                <span class="card-atk-pill" style="background:${myCard.color};">${myCard.power}</span>
+                            </div>
+                            <div class="card-art-box" style="color:${myCard.color};">
+                                <i class="fa-solid ${myCard.icon}"></i>
+                            </div>
+                            <div class="card-title-txt">${myCard.name}</div>
+                            <div class="card-footer-stats">
+                                <span>ATK ${myCard.power}</span>
+                                <span>DEF ${myCard.def}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Renderizar carta do Oponente virada para trás inicial
+            slot2.innerHTML = `
+                <div class="card-3d-wrapper" style="cursor:default;">
+                    <div class="card-3d-inner flipped" id="opp-reveal-card">
+                        <div class="card-face card-face-front" style="border-color:${oppCard.color};">
+                            <div class="card-header-row">
+                                <i class="fa-solid ${oppCard.icon} card-type-icon" style="color:${oppCard.color};"></i>
+                                <span class="card-atk-pill opp">${oppCard.power}</span>
+                            </div>
+                            <div class="card-art-box" style="color:${oppCard.color};">
+                                <i class="fa-solid ${oppCard.icon}"></i>
+                            </div>
+                            <div class="card-title-txt">${oppCard.name}</div>
+                            <div class="card-footer-stats">
+                                <span>ATK ${oppCard.power}</span>
+                                <span>DEF ${oppCard.def}</span>
+                            </div>
+                        </div>
+                        <div class="card-face card-face-back">
+                            <i class="fa-solid fa-skull"></i>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 3D Flip Revelação da Carta do Oponente
+            setTimeout(() => {
+                const oppCardInner = document.getElementById('opp-reveal-card');
+                if (oppCardInner) oppCardInner.classList.remove('flipped');
+                AudioKit.cardPick();
+
+                // Resolver Combate
+                setTimeout(() => {
+                    const diff = myCard.power - oppCard.power;
+                    const feedback = document.getElementById('round-feedback');
+
+                    if (diff > 0) {
+                        p1Score++;
+                        p2Health = Math.max(0, p2Health - 35);
+                        feedback.innerText = `Vitória na Ronda! (+${diff} Poder)`;
+                        feedback.style.color = '#22C98B';
+                        triggerDamageFloat(`-${diff} HP`, '#F0444A', slot2);
+                        AudioKit.clashImpact(true);
+                    } else if (diff < 0) {
+                        p2Score++;
+                        p1Health = Math.max(0, p1Health - 35);
+                        feedback.innerText = `Derrota na Ronda! (${diff} Poder)`;
+                        feedback.style.color = '#F0444A';
+                        triggerDamageFloat(`${diff} HP`, '#F0444A', slot1);
+                        AudioKit.clashImpact(false);
+                    } else {
+                        feedback.innerText = 'Empate Tático! Mesma força.';
+                        feedback.style.color = '#F59E0B';
+                    }
+
+                    // Atualizar HUD
+                    document.getElementById('p1-hp').style.width = p1Health + '%';
+                    document.getElementById('p2-hp').style.width = p2Health + '%';
+                    if (p1Health <= 30) document.getElementById('p1-hp').classList.add('danger');
+                    if (p2Health <= 30) document.getElementById('p2-hp').classList.add('danger');
+
+                    document.getElementById('p1-score').innerText = p1Score;
+                    document.getElementById('p2-score').innerText = p2Score;
+
+                    // Notificar parent da arena se em iframe
+                    if (window.parent && window.parent !== window) {
+                        window.parent.postMessage({
+                            type: 'arena_score_update',
+                            score: p1Score * 100,
+                            oppScore: p2Score * 100
+                        }, '*');
+                    }
+
+                    // Avançar ou Finalizar
+                    setTimeout(() => {
+                        curRound++;
+                        if (curRound > 3 || p1Score >= 2 || p2Score >= 2 || p1Health <= 0 || p2Health <= 0) {
+                            endMatch();
+                        } else {
+                            document.getElementById('cur-round').innerText = curRound;
+                            slot1.innerHTML = '';
+                            slot2.innerHTML = '';
+                            feedback.innerText = '';
+                            canPlay = true;
+                        }
+                    }, 1500);
+
+                }, 700);
+
+            }, 600);
+        }
+
+        function endMatch() {
+            const overlay = document.getElementById('result-overlay');
+            const title = document.getElementById('res-title');
+            const desc = document.getElementById('res-desc');
+            const icon = document.getElementById('res-icon');
+            overlay.style.display = 'flex';
+
+            const won = p1Score >= p2Score;
+            if (won) {
+                title.innerText = 'VITÓRIA ÉPICA!';
+                title.className = 'result-headline win';
+                icon.innerHTML = '<i class="fa-solid fa-trophy" style="color:#22C98B;"></i>';
+                desc.innerText = `Sensacional, ${myName}! Venceste por ${p1Score} a ${p2Score} e conquistaste o prémio da batalha!`;
+                AudioKit.fanfare(true);
+            } else {
+                title.innerText = 'DERROTA NO DUELO';
+                title.className = 'result-headline loss';
+                icon.innerHTML = '<i class="fa-solid fa-skull" style="color:#F0444A;"></i>';
+                desc.innerText = `${oppName} venceu por ${p2Score} a ${p1Score}. Treina a tua mão e volta a desafiar na Arena!`;
+                AudioKit.fanfare(false);
+            }
+
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({
+                    type: 'arena_finish',
+                    result: won ? 'win' : 'loss',
+                    myScore: p1Score * 100,
+                    peerScore: p2Score * 100
+                }, '*');
+            }
+        }
+
+        function restartMatch() {
+            document.getElementById('result-overlay').style.display = 'none';
+            p1Health = 100;
+            p2Health = 100;
+            curRound = 1;
+            p1Score = 0;
+            p2Score = 0;
+            canPlay = true;
+            document.getElementById('cur-round').innerText = '1';
+            document.getElementById('p1-score').innerText = '0';
+            document.getElementById('p2-score').innerText = '0';
+            document.getElementById('p1-hp').style.width = '100%';
+            document.getElementById('p2-hp').style.width = '100%';
+            document.getElementById('p1-hp').classList.remove('danger');
+            document.getElementById('p2-hp').classList.remove('danger');
+            document.getElementById('p1-played-slot').innerHTML = '';
+            document.getElementById('p2-played-slot').innerHTML = '';
+            document.getElementById('round-feedback').innerText = '';
+            dealCards();
+        }
+
+        dealCards();
+    </script>
+</body>
+</html>

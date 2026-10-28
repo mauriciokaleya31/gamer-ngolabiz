@@ -1,0 +1,26 @@
+# Logs e arquivos temporários
+*.log
+*.tmp
+*.temp
+
+# Sistema Operacional
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# IDE e Editores
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.project
+.settings/
+
+# Arquivos de backup / migração temporária
+*.bak
+*_tmp.php

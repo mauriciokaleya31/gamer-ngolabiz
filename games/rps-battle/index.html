@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Pedra, Papel e Tesoura 3D 1v1 — Casino56 Arena</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --bg-dark: #07090e;
+            --surface-plate: #131822;
+            --border-line: #242c3d;
+            --red-p2: #F0444A;
+            --green-p1: #22C98B;
+            --yellow-timer: #F59E0B;
+            --text-light: #F5F7FA;
+            --text-muted: #9AA4B2;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: var(--bg-dark);
+            color: var(--text-light);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Canvas de Partículas Dinâmicas */
+        #bg-canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 1;
+            pointer-events: none;
+            opacity: 0.65;
+        }
+
+        /* HUD Superior */
+        .hud-top {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            background: rgba(16, 20, 28, 0.94);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+        }
+
+        .player-chip {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .avatar-frame {
+            position: relative;
+            width: 44px;
+            height: 44px;
+        }
+        .player-img {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--green-p1);
+            box-shadow: 0 0 12px rgba(34, 201, 139, 0.5);
+        }
+        .player-img.opp {
+            border-color: var(--red-p2);
+            box-shadow: 0 0 12px rgba(240, 68, 74, 0.5);
+        }
+
+        .player-details { display: flex; flex-direction: column; }
+        .player-tag { font-weight: 800; font-size: 0.85rem; color: #fff; }
+
+        .score-dots-container {
+            display: flex;
+            gap: 6px;
+            margin-top: 4px;
+        }
+        .score-orb {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.06);
+            border: 1.5px solid #283142;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .score-orb.active-p1 {
+            background: var(--green-p1);
+            border-color: var(--green-p1);
+            box-shadow: 0 0 10px var(--green-p1);
+            transform: scale(1.15);
+        }
+        .score-orb.active-p2 {
+            background: var(--red-p2);
+            border-color: var(--red-p2);
+            box-shadow: 0 0 10px var(--red-p2);
+            transform: scale(1.15);
+        }
+
+        /* Timer Circular SVG */
+        .timer-pod {
+            position: relative;
+            width: 54px;
+            height: 54px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .timer-svg {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            transform: rotate(-90deg);
+        }
+        .timer-circle-bg {
+            fill: none;
+            stroke: rgba(255,255,255,0.08);
+            stroke-width: 4;
+        }
+        .timer-circle-prog {
+            fill: none;
+            stroke: var(--yellow-timer);
+            stroke-width: 4;
+            stroke-dasharray: 157;
+            stroke-dashoffset: 0;
+            transition: stroke-dashoffset 1s linear, stroke 0.3s;
+        }
+        .timer-num-txt {
+            font-size: 1.25rem;
+            font-weight: 900;
+            color: var(--yellow-timer);
+            z-index: 2;
+            text-shadow: 0 0 8px currentColor;
+        }
+        .timer-num-txt.urgent {
+            color: var(--red-p2);
+            animation: timerBeat 0.5s infinite alternate;
+        }
+        @keyframes timerBeat {
+            from { transform: scale(1); }
+            to { transform: scale(1.18); }
+        }
+
+        /* Arena 3D Central */
+        .arena-viewport {
+            flex: 1;
+            position: relative;
+            z-index: 5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            perspective: 1200px;
+            padding: 10px;
+            overflow: hidden;
+        }
+
+        /* Ringue Holográfico 3D */
+        .stage-ring-3d {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) rotateX(55deg);
+            width: 85%;
+            max-width: 580px;
+            height: 260px;
+            border-radius: 50%;
+            border: 3px solid rgba(34, 201, 139, 0.3);
+            background: radial-gradient(ellipse at center, rgba(34, 201, 139, 0.12) 0%, rgba(240, 68, 74, 0.08) 50%, transparent 80%);
+            box-shadow: 0 0 50px rgba(34, 201, 139, 0.2), inset 0 0 30px rgba(240, 68, 74, 0.15);
+            pointer-events: none;
+        }
+
+        /* Pódios 3D dos Lutadores */
+        .fighters-stage-3d {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 28px;
+            width: 100%;
+            max-width: 520px;
+            z-index: 8;
+            position: relative;
+        }
+
+        .podium-box-3d {
+            flex: 1;
+            max-width: 160px;
+            height: 160px;
+            background: linear-gradient(145deg, #161c27, #0e1219);
+            border: 2px solid var(--border-line);
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.1);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+        }
+        .podium-box-3d.p1 {
+            transform: rotateY(-10deg);
+        }
+        .podium-box-3d.p2 {
+            transform: rotateY(10deg);
+        }
+
+        .podium-box-3d.active-p1 {
+            border-color: var(--green-p1);
+            box-shadow: 0 0 30px rgba(34, 201, 139, 0.5), inset 0 0 15px rgba(34, 201, 139, 0.2);
+            transform: rotateY(-10deg) scale(1.08);
+        }
+        .podium-box-3d.active-p2 {
+            border-color: var(--red-p2);
+            box-shadow: 0 0 30px rgba(240, 68, 74, 0.5), inset 0 0 15px rgba(240, 68, 74, 0.2);
+            transform: rotateY(10deg) scale(1.08);
+        }
+
+        .hand-icon-3d {
+            font-size: 4rem;
+            color: #64748b;
+            transition: all 0.3s ease;
+            filter: drop-shadow(0 6px 12px rgba(0,0,0,0.5));
+        }
+        .podium-box-3d.active-p1 .hand-icon-3d {
+            color: var(--green-p1);
+            filter: drop-shadow(0 0 16px rgba(34, 201, 139, 0.8));
+            animation: handPop 0.4s ease;
+        }
+        .podium-box-3d.active-p2 .hand-icon-3d {
+            color: var(--red-p2);
+            filter: drop-shadow(0 0 16px rgba(240, 68, 74, 0.8));
+            animation: handPop 0.4s ease;
+        }
+        @keyframes handPop {
+            0% { transform: scale(0.6); }
+            60% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        /* Animação Clássica de Shake "1, 2, 3... JÁ!" */
+        .hand-shaking {
+            animation: rpsShake 0.4s infinite alternate ease-in-out;
+        }
+        @keyframes rpsShake {
+            from { transform: translateY(-8px) rotate(-8deg); }
+            to { transform: translateY(8px) rotate(8deg); }
+        }
+
+        .podium-tag {
+            font-size: 0.75rem;
+            font-weight: 800;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .vs-divider-3d {
+            font-size: 1.8rem;
+            font-weight: 900;
+            color: #fff;
+            background: linear-gradient(135deg, #F0444A, #991b1b);
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #fff;
+            box-shadow: 0 0 20px rgba(240, 68, 74, 0.6);
+            letter-spacing: 1px;
+            z-index: 10;
+        }
+
+        /* Banner de Feedback de Ronda */
+        .feedback-banner {
+            margin-top: 18px;
+            font-size: 1.05rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            min-height: 28px;
+            text-align: center;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+            z-index: 10;
+        }
+
+        /* Painel Inferior de Botões Arcade 3D */
+        .controls-arcade-bar {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            background: rgba(14, 18, 25, 0.96);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            backdrop-filter: blur(12px);
+        }
+
+        .controls-instruction {
+            font-size: 0.78rem;
+            font-weight: 800;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .arcade-buttons-grid {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            width: 100%;
+            max-width: 460px;
+        }
+
+        /* BOTÃO ARCADE 3D TÁTIL */
+        .btn-arcade-3d {
+            flex: 1;
+            padding: 14px 8px;
+            background: linear-gradient(180deg, #1b2230, #131822);
+            border: 2px solid #283347;
+            border-radius: 16px;
+            color: #F5F7FA;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #0d1118, 0 10px 20px rgba(0,0,0,0.5);
+            transition: all 0.12s ease;
+            position: relative;
+        }
+        .btn-arcade-3d:active:not(:disabled) {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #0d1118, 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .btn-arcade-3d i {
+            font-size: 2.2rem;
+            color: var(--green-p1);
+            transition: transform 0.2s;
+        }
+        .btn-arcade-3d span {
+            font-size: 0.82rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .btn-arcade-3d .key-badge {
+            position: absolute;
+            top: 6px; right: 8px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 4px;
+            padding: 1px 5px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: var(--text-muted);
+        }
+
+        .btn-arcade-3d:hover:not(:disabled) {
+            border-color: var(--green-p1);
+            box-shadow: 0 6px 0 #0d1118, 0 0 20px rgba(34, 201, 139, 0.4);
+        }
+        .btn-arcade-3d:hover:not(:disabled) i {
+            transform: scale(1.15);
+        }
+
+        .btn-arcade-3d.selected {
+            background: linear-gradient(180deg, rgba(34,201,139,0.25), rgba(34,201,139,0.1));
+            border-color: var(--green-p1);
+            transform: translateY(2px);
+            box-shadow: 0 4px 0 #0d1118, 0 0 25px rgba(34, 201, 139, 0.6);
+        }
+        .btn-arcade-3d:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        /* Overlay Final de Partida */
+        .result-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(7, 9, 14, 0.94);
+            backdrop-filter: blur(10px);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 60;
+            padding: 24px;
+            text-align: center;
+        }
+        .res-badge-icon {
+            font-size: 3.5rem;
+            margin-bottom: 8px;
+        }
+        .res-headline {
+            font-size: 2.2rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+        }
+        .res-headline.win {
+            color: var(--green-p1);
+            text-shadow: 0 0 25px rgba(34, 201, 139, 0.6);
+        }
+        .res-headline.loss {
+            color: var(--red-p2);
+            text-shadow: 0 0 25px rgba(240, 68, 74, 0.6);
+        }
+        .res-sub {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            max-width: 400px;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .btn-tactile-3d {
+            padding: 12px 28px;
+            background: linear-gradient(180deg, #22C98B, #10b981);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            cursor: pointer;
+            box-shadow: 0 5px 0 #065f46, 0 10px 20px rgba(34, 201, 139, 0.4);
+            transition: all 0.15s ease;
+        }
+        .btn-tactile-3d:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #065f46, 0 4px 10px rgba(34, 201, 139, 0.4);
+        }
+
+        /* Ecrãs Pequenos (Mobile) */
+        @media (max-width: 480px) {
+            .hud-top { padding: 8px 12px; }
+            .player-img { width: 38px; height: 38px; }
+            .podium-box-3d { height: 130px; }
+            .hand-icon-3d { font-size: 3rem; }
+            .btn-arcade-3d { padding: 10px 6px; }
+            .btn-arcade-3d i { font-size: 1.7rem; }
+            .btn-arcade-3d span { font-size: 0.72rem; }
+            .arcade-buttons-grid { gap: 8px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Canvas de Partículas 3D -->
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- Top HUD -->
+    <header class="hud-top">
+        <div class="player-chip">
+            <div class="avatar-frame">
+                <img src="" id="p1-avatar" class="player-img" alt="Você">
+            </div>
+            <div class="player-details">
+                <span class="player-tag" id="p1-name">Você</span>
+                <div class="score-dots-container">
+                    <div class="score-orb" id="p1-dot-1"></div>
+                    <div class="score-orb" id="p1-dot-2"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timer Circular SVG -->
+        <div class="timer-pod">
+            <svg class="timer-svg" viewBox="0 0 54 54">
+                <circle class="timer-circle-bg" cx="27" cy="27" r="25"></circle>
+                <circle class="timer-circle-prog" id="timer-prog-svg" cx="27" cy="27" r="25"></circle>
+            </svg>
+            <span class="timer-num-txt" id="timer-num">10</span>
+        </div>
+
+        <div class="player-chip" style="flex-direction: row-reverse; text-align: right;">
+            <div class="avatar-frame">
+                <img src="" id="p2-avatar" class="player-img opp" alt="Oponente">
+            </div>
+            <div class="player-details">
+                <span class="player-tag" id="p2-name">Oponente</span>
+                <div class="score-dots-container" style="justify-content: flex-end;">
+                    <div class="score-orb" id="p2-dot-1"></div>
+                    <div class="score-orb" id="p2-dot-2"></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Arena 3D Central -->
+    <main class="arena-viewport">
+        <!-- Ringue Holográfico Inclinado -->
+        <div class="stage-ring-3d"></div>
+
+        <div class="fighters-stage-3d">
+            <!-- Pódio P1 -->
+            <div class="podium-box-3d p1" id="p1-podium">
+                <i class="fa-solid fa-question hand-icon-3d" id="p1-icon"></i>
+                <span class="podium-tag" id="p1-label">Aguardando...</span>
+            </div>
+
+            <div class="vs-divider-3d">VS</div>
+
+            <!-- Pódio P2 -->
+            <div class="podium-box-3d p2" id="p2-podium">
+                <i class="fa-solid fa-question hand-icon-3d" id="p2-icon"></i>
+                <span class="podium-tag" id="p2-label">Aguardando...</span>
+            </div>
+        </div>
+
+        <div class="feedback-banner" id="feedback-banner">Prepara a tua jogada!</div>
+    </main>
+
+    <!-- Painel de Controlo Arcade 3D -->
+    <footer class="controls-arcade-bar">
+        <div class="controls-instruction">
+            <i class="fa-solid fa-bolt" style="color:var(--green-p1);"></i> Escolhe a tua jogada antes que o tempo esgote:
+        </div>
+        <div class="arcade-buttons-grid">
+            <button type="button" class="btn-arcade-3d" onclick="makeChoice('rock')" id="btn-rock">
+                <span class="key-badge">1</span>
+                <i class="fa-solid fa-hand-back-fist"></i>
+                <span>Pedra</span>
+            </button>
+            <button type="button" class="btn-arcade-3d" onclick="makeChoice('paper')" id="btn-paper">
+                <span class="key-badge">2</span>
+                <i class="fa-solid fa-hand"></i>
+                <span>Papel</span>
+            </button>
+            <button type="button" class="btn-arcade-3d" onclick="makeChoice('scissors')" id="btn-scissors">
+                <span class="key-badge">3</span>
+                <i class="fa-solid fa-hand-scissors"></i>
+                <span>Tesoura</span>
+            </button>
+        </div>
+    </footer>
+
+    <!-- Overlay Final de Partida -->
+    <div class="result-overlay" id="result-overlay">
+        <div class="res-badge-icon" id="res-icon"><i class="fa-solid fa-trophy" style="color:var(--green-p1);"></i></div>
+        <div class="res-headline" id="res-title">VITÓRIA!</div>
+        <p class="res-sub" id="res-desc">Venceste o confronto 1v1 com agilidade mental superior!</p>
+        <button type="button" class="btn-tactile-3d" onclick="restartMatch()">
+            <i class="fa-solid fa-rotate-right"></i> Batalhar Novamente
+        </button>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const myName = urlParams.get('user_name') || 'Jogador';
+        const myAvatar = urlParams.get('user_avatar') || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
+        const oppName = urlParams.get('opp_name') || 'Combatente';
+        const oppAvatar = urlParams.get('opp_avatar') || 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?auto=format&fit=crop&w=150&q=80';
+
+        document.getElementById('p1-name').innerText = myName;
+        document.getElementById('p1-avatar').src = myAvatar;
+        document.getElementById('p2-name').innerText = oppName;
+        document.getElementById('p2-avatar').src = oppAvatar;
+
+        // Fundo Canvas 3D
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let particles = [];
+
+        function resizeCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            particles = [];
+            for (let i = 0; i < 40; i++) {
+                particles.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    vx: (Math.random() - 0.5) * 0.4,
+                    vy: (Math.random() - 0.5) * 0.4,
+                    size: Math.random() * 2 + 1,
+                    color: Math.random() > 0.5 ? '#22C98B' : '#F0444A'
+                });
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function animateBg() {
+            ctx.clearRect(0, 0, width, height);
+            for (let p of particles) {
+                p.x += p.vx;
+                p.y += p.vy;
+                if (p.x < 0) p.x = width;
+                if (p.x > width) p.x = 0;
+                if (p.y < 0) p.y = height;
+                if (p.y > height) p.y = 0;
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.shadowBlur = 6;
+                ctx.shadowColor = p.color;
+                ctx.fill();
+            }
+            requestAnimationFrame(animateBg);
+        }
+        animateBg();
+
+        // Sintetizador de Áudio e Vibração Tátil
+        const AudioKit = (() => {
+            let ctx = null;
+            function getCtx() {
+                if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+                if (ctx.state === 'suspended') ctx.resume();
+                return ctx;
+            }
+
+            return {
+                click: () => {
+                    try {
+                        const c = getCtx();
+                        const osc = c.createOscillator();
+                        const g = c.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(600, c.currentTime);
+                        osc.frequency.exponentialRampToValueAtTime(1200, c.currentTime + 0.05);
+                        g.gain.setValueAtTime(0.12, c.currentTime);
+                        g.gain.exponentialRampToValueAtTime(0.01, c.currentTime + 0.05);
+                        osc.connect(g);
+                        g.connect(c.destination);
+                        osc.start();
+                        osc.stop(c.currentTime + 0.05);
+                    } catch(e){}
+                    if (navigator.vibrate) navigator.vibrate(25);
+                },
+                tick: () => {
+                    try {
+                        const c = getCtx();
+                        const osc = c.createOscillator();
+                        const g = c.createGain();
+                        osc.type = 'square';
+                        osc.frequency.value = 400;
+                        g.gain.setValueAtTime(0.08, c.currentTime);
+                        g.gain.exponentialRampToValueAtTime(0.01, c.currentTime + 0.04);
+                        osc.connect(g);
+                        g.connect(c.destination);
+                        osc.start();
+                        osc.stop(c.currentTime + 0.04);
+                    } catch(e){}
+                },
+                result: (won) => {
+                    try {
+                        const c = getCtx();
+                        const osc = c.createOscillator();
+                        const g = c.createGain();
+                        osc.type = won ? 'triangle' : 'sawtooth';
+                        osc.frequency.setValueAtTime(won ? 520 : 180, c.currentTime);
+                        osc.frequency.exponentialRampToValueAtTime(won ? 880 : 90, c.currentTime + 0.35);
+                        g.gain.setValueAtTime(0.2, c.currentTime);
+                        g.gain.exponentialRampToValueAtTime(0.01, c.currentTime + 0.35);
+                        osc.connect(g);
+                        g.connect(c.destination);
+                        osc.start();
+                        osc.stop(c.currentTime + 0.35);
+                    } catch(e){}
+                }
+            };
+        })();
+
+        // Atalhos de Teclado (1, 2, 3)
+        window.addEventListener('keydown', (e) => {
+            if (e.key === '1') makeChoice('rock');
+            if (e.key === '2') makeChoice('paper');
+            if (e.key === '3') makeChoice('scissors');
+        });
+
+        const CHOICES = {
+            'rock': { name: 'Pedra', icon: 'fa-hand-back-fist' },
+            'paper': { name: 'Papel', icon: 'fa-hand' },
+            'scissors': { name: 'Tesoura', icon: 'fa-hand-scissors' }
+        };
+
+        let p1Score = 0;
+        let p2Score = 0;
+        let timerSeconds = 10;
+        let timerInterval = null;
+        let myChoice = null;
+        let roundActive = true;
+        const totalCircumference = 2 * Math.PI * 25; // aprox 157
+
+        function startRoundTimer() {
+            clearInterval(timerInterval);
+            timerSeconds = 10;
+            myChoice = null;
+            roundActive = true;
+            updateTimerDisplay();
+
+            ['rock', 'paper', 'scissors'].forEach(c => {
+                const btn = document.getElementById('btn-' + c);
+                btn.disabled = false;
+                btn.classList.remove('selected');
+            });
+
+            const p1P = document.getElementById('p1-podium');
+            const p2P = document.getElementById('p2-podium');
+            p1P.className = 'podium-box-3d p1';
+            p2P.className = 'podium-box-3d p2';
+            document.getElementById('p1-icon').className = 'fa-solid fa-question hand-icon-3d';
+            document.getElementById('p2-icon').className = 'fa-solid fa-question hand-icon-3d';
+            document.getElementById('p1-label').innerText = 'Aguardando...';
+            document.getElementById('p2-label').innerText = 'Aguardando...';
+
+            const banner = document.getElementById('feedback-banner');
+            banner.innerText = 'Prepara a tua jogada!';
+            banner.style.color = '#F59E0B';
+
+            timerInterval = setInterval(() => {
+                timerSeconds--;
+                updateTimerDisplay();
+                if (timerSeconds <= 0) {
+                    clearInterval(timerInterval);
+                    if (!myChoice) {
+                        const opts = ['rock', 'paper', 'scissors'];
+                        makeChoice(opts[Math.floor(Math.random() * opts.length)]);
+                    }
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const numEl = document.getElementById('timer-num');
+            const progEl = document.getElementById('timer-prog-svg');
+            numEl.innerText = timerSeconds;
+
+            const offset = totalCircumference * (1 - (timerSeconds / 10));
+            progEl.style.strokeDashoffset = offset;
+
+            if (timerSeconds <= 3) {
+                numEl.classList.add('urgent');
+                progEl.style.stroke = 'var(--red-p2)';
+                AudioKit.tick();
+            } else {
+                numEl.classList.remove('urgent');
+                progEl.style.stroke = 'var(--yellow-timer)';
+            }
+        }
+
+        function makeChoice(choice) {
+            if (!roundActive || myChoice) return;
+            myChoice = choice;
+            roundActive = false;
+            clearInterval(timerInterval);
+            AudioKit.click();
+
+            const btn = document.getElementById('btn-' + choice);
+            if (btn) btn.classList.add('selected');
+            ['rock', 'paper', 'scissors'].forEach(c => {
+                document.getElementById('btn-' + c).disabled = true;
+            });
+
+            // Animação pré-revelação "1, 2, 3... JÁ!"
+            const p1Icon = document.getElementById('p1-icon');
+            const p2Icon = document.getElementById('p2-icon');
+            p1Icon.className = 'fa-solid fa-hand-back-fist hand-icon-3d hand-shaking';
+            p2Icon.className = 'fa-solid fa-hand-back-fist hand-icon-3d hand-shaking';
+
+            const banner = document.getElementById('feedback-banner');
+            banner.innerText = 'Pedra... Papel... Tesoura...';
+            banner.style.color = '#F59E0B';
+
+            const options = ['rock', 'paper', 'scissors'];
+            const oppChoice = options[Math.floor(Math.random() * options.length)];
+
+            setTimeout(() => {
+                revealHands(choice, oppChoice);
+            }, 900);
+        }
+
+        function revealHands(c1, c2) {
+            const p1P = document.getElementById('p1-podium');
+            const p2P = document.getElementById('p2-podium');
+            const i1 = document.getElementById('p1-icon');
+            const i2 = document.getElementById('p2-icon');
+            const l1 = document.getElementById('p1-label');
+            const l2 = document.getElementById('p2-label');
+
+            i1.className = 'fa-solid ' + CHOICES[c1].icon + ' hand-icon-3d';
+            i2.className = 'fa-solid ' + CHOICES[c2].icon + ' hand-icon-3d';
+            l1.innerText = CHOICES[c1].name;
+            l2.innerText = CHOICES[c2].name;
+
+            const banner = document.getElementById('feedback-banner');
+
+            if (c1 === c2) {
+                banner.innerText = 'EMPATE! Ambos escolheram ' + CHOICES[c1].name;
+                banner.style.color = '#F59E0B';
+                p1P.className = 'podium-box-3d p1 active-p1';
+                p2P.className = 'podium-box-3d p2 active-p2';
+                AudioKit.click();
+            } else if (
+                (c1 === 'rock' && c2 === 'scissors') ||
+                (c1 === 'paper' && c2 === 'rock') ||
+                (c1 === 'scissors' && c2 === 'paper')
+            ) {
+                p1Score++;
+                banner.innerText = `VITÓRIA NA RONDA! ${CHOICES[c1].name} supera ${CHOICES[c2].name}!`;
+                banner.style.color = '#22C98B';
+                p1P.className = 'podium-box-3d p1 active-p1';
+                p2P.className = 'podium-box-3d p2';
+                AudioKit.result(true);
+            } else {
+                p2Score++;
+                banner.innerText = `DERROTA NA RONDA! ${CHOICES[c2].name} supera ${CHOICES[c1].name}!`;
+                banner.style.color = '#F0444A';
+                p1P.className = 'podium-box-3d p1';
+                p2P.className = 'podium-box-3d p2 active-p2';
+                AudioKit.result(false);
+            }
+
+            updateScoreOrbs();
+
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({
+                    type: 'arena_score_update',
+                    score: p1Score * 100,
+                    oppScore: p2Score * 100
+                }, '*');
+            }
+
+            setTimeout(() => {
+                if (p1Score >= 2 || p2Score >= 2) {
+                    endMatch();
+                } else {
+                    startRoundTimer();
+                }
+            }, 1600);
+        }
+
+        function updateScoreOrbs() {
+            const p1d1 = document.getElementById('p1-dot-1');
+            const p1d2 = document.getElementById('p1-dot-2');
+            const p2d1 = document.getElementById('p2-dot-1');
+            const p2d2 = document.getElementById('p2-dot-2');
+
+            p1d1.className = p1Score >= 1 ? 'score-orb active-p1' : 'score-orb';
+            p1d2.className = p1Score >= 2 ? 'score-orb active-p1' : 'score-orb';
+            p2d1.className = p2Score >= 1 ? 'score-orb active-p2' : 'score-orb';
+            p2d2.className = p2Score >= 2 ? 'score-orb active-p2' : 'score-orb';
+        }
+
+        function endMatch() {
+            clearInterval(timerInterval);
+            const overlay = document.getElementById('result-overlay');
+            const title = document.getElementById('res-title');
+            const desc = document.getElementById('res-desc');
+            const icon = document.getElementById('res-icon');
+            overlay.style.display = 'flex';
+
+            const won = p1Score >= 2;
+            if (won) {
+                title.innerText = 'VITÓRIA ÉPICA!';
+                title.className = 'res-headline win';
+                icon.innerHTML = '<i class="fa-solid fa-trophy" style="color:var(--green-p1);"></i>';
+                desc.innerText = `Sensacional, ${myName}! Venceste por ${p1Score} a ${p2Score} e faturaste o prémio da mesa!`;
+                AudioKit.result(true);
+            } else {
+                title.innerText = 'DERROTA NO DUELO';
+                title.className = 'res-headline loss';
+                icon.innerHTML = '<i class="fa-solid fa-skull" style="color:var(--red-p2);"></i>';
+                desc.innerText = `${oppName} venceu por ${p2Score} a ${p1Score}. Treina a tua velocidade de reação e volta a desafiar!`;
+                AudioKit.result(false);
+            }
+
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({
+                    type: 'arena_finish',
+                    result: won ? 'win' : 'loss',
+                    myScore: p1Score * 100,
+                    peerScore: p2Score * 100
+                }, '*');
+            }
+        }
+
+        function restartMatch() {
+            document.getElementById('result-overlay').style.display = 'none';
+            p1Score = 0;
+            p2Score = 0;
+            updateScoreOrbs();
+            startRoundTimer();
+        }
+
+        startRoundTimer();
+    </script>
+</body>
+</html>
