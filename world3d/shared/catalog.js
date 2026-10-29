@@ -19,7 +19,7 @@ export const CLOTHING = [
   C('camisa', 'top', 'Camisa de manga comprida', 800),
   C('casaco_leve', 'top', 'Casaco leve', 1500),
   C('camisa_capulana', 'top', 'Camisa de capulana', 1200),
-  C('vestido', 'top', 'Vestido', 1800, { gender: 'f' }),
+  C('vestido', 'top', 'Vestido', 0, { gender: 'f' }),
   C('fato_treino', 'top', 'Casaco de fato de treino', 1400),
   C('hoodie', 'top', 'Hoodie com capuz', 2000),
   C('colete', 'top', 'Colete acolchoado sobre hoodie', 2600),

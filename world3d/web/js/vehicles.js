@@ -33,6 +33,12 @@ function wheel(radius, width) {
 }
 
 export const VEHICLE_SPECS = {
+  // Ajuste de radios para colisões mais robustas
+  car: { maxSpeed: 38, accel: 7.5, brake: 14, reverse: 8, wheelbase: 2.6, maxSteer: 0.55, length: 4.3, width: 1.8, radius: 1.2, mass: 1 },
+  taxi: { maxSpeed: 32, accel: 6.5, brake: 13, reverse: 7, wheelbase: 2.9, maxSteer: 0.5, length: 4.8, width: 1.9, radius: 1.2, mass: 1.2 },
+  carrinha: { maxSpeed: 30, accel: 5.5, brake: 12, reverse: 6, wheelbase: 3.0, maxSteer: 0.48, length: 5.0, width: 2.0, radius: 1.3, mass: 1.4 },
+  moto: { maxSpeed: 42, accel: 9.5, brake: 15, reverse: 3, wheelbase: 1.45, maxSteer: 0.6, length: 2.1, width: 0.8, radius: 0.7, mass: 0.5 },
+
   car: { maxSpeed: 38, accel: 7.5, brake: 14, reverse: 8, wheelbase: 2.6, maxSteer: 0.55, length: 4.3, width: 1.8, radius: 1.05, mass: 1 },
   taxi: { maxSpeed: 32, accel: 6.5, brake: 13, reverse: 7, wheelbase: 2.9, maxSteer: 0.5, length: 4.8, width: 1.9, radius: 1.1, mass: 1.2 },
   carrinha: { maxSpeed: 30, accel: 5.5, brake: 12, reverse: 6, wheelbase: 3.0, maxSteer: 0.48, length: 5.0, width: 2.0, radius: 1.2, mass: 1.4 },

@@ -156,7 +156,7 @@ export class ShopService {
       const it = this.byId.get(id);
       return it && it.slot === slot && isSelectable(it) && (it.gender === 'u' || it.gender === out.gender) && (trustAll || this.owns(playerId, id));
     };
-    for (const [slot, def] of Object.entries(DEFAULTS)) if (!ok(out[slot], slot)) out[slot] = slot === 'top' && out.gender === 'f' && ok('blusa', 'top') ? 'blusa' : def;
+    for (const [slot, def] of Object.entries(DEFAULTS)) if (!ok(out[slot], slot)) out[slot] = slot === 'top' && out.gender === 'f' && ok('vestido', 'top') ? 'vestido' : def;
     const acc = {};
     for (const slot of OPTIONAL_SLOTS) {
       const id = out.accessories?.[slot];
