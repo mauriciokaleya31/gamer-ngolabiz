@@ -170,7 +170,7 @@ export class LocalPlayer {
   }
 
   resolveFoot(x, z, y, dynamic) {
-    const r = 0.35;
+    const r = 0.45; // aumentamos o raio de colisão para evitar atravessagens finas
     for (let iter = 0; iter < 2; iter++) {
       for (const b of this.boxes) {
         if (b.h !== undefined && y > b.h - 0.3) continue; // por cima de obstáculos baixos
