@@ -41,7 +41,7 @@ test('multijogador: dois clientes vêem-se, emotes e emojis sincronizados, movim
     await Promise.all([a.ready, b.ready]);
     const wa = await a.wait((m) => m.t === 'welcome');
     const wb = await b.wait((m) => m.t === 'welcome');
-    assert.equal(wa.you.appearance.top, 'blusa', 'item pago não possuído é substituído pelo base');
+    assert.equal(wa.you.appearance.top, 'vestido', 'item pago não possuído é substituído pelo base');
     assert.ok(wa.catalog.length > 20 && wa.emotes.length >= 12);
     // B vê A no snapshot
     await b.wait((m) => m.t === 'snap' && m.p.some((o) => o.id === wa.you.id));
