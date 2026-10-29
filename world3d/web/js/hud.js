@@ -12,6 +12,13 @@ const kz = (v) => `${Number(v).toLocaleString('pt-AO', { minimumFractionDigits: 
 const PERIODS = { amanhecer: 'Amanhecer', manha: 'Manhã', tarde: 'Tarde', por_do_sol: 'Pôr do Sol', noite: 'Noite' };
 const STAKES = [0, 500, 1000, 2000, 5000];
 
+function calculatePrizeSplit(stakeKz, count = 2, feePct = 20) {
+  const potKz = (Number(stakeKz) || 0) * count;
+  const feeKz = Math.round((potKz * feePct) / 100);
+  const prizeKz = potKz - feeKz;
+  return { potKz, prizeKz, feeKz, winnerPct: 100 - feePct, housePct: feePct };
+}
+
 export function weatherLabel(w) {
   if (!w) return '—';
   if (w.rain > 0.6) return 'Chuva forte';
@@ -39,8 +46,12 @@ export class Hud {
     this.menuTab = 'perfil';
     this.minimap = $('minimap');
     this.mmCtx = this.minimap.getContext('2d');
+    this.waypoint = null;
     this.buildMinimapBase();
     this.bind(onCloseDialogue);
+    this.minimap.style.cursor = 'pointer';
+    this.minimap.title = 'Clica para abrir o Mapa Geral da Cidade (M)';
+    this.minimap.onclick = () => this.onAction?.('open_map');
     net.on('chat', (m) => this.chatLine(m.name, m.text, m.scope));
     net.on('system', (m) => this.chatLine(null, m.text));
     net.on('error', (m) => this.toast(m.message, 'bad'));
@@ -106,32 +117,64 @@ export class Hud {
 
   // -------------------------------------------------------------- minimapa
   buildMinimapBase() {
-    const scale = 2;
+    const scale = 1.25;
     const c = document.createElement('canvas');
-    c.width = 300 * scale;
-    c.height = 260 * scale;
+    c.width = 540 * scale;
+    c.height = 460 * scale;
     const g = c.getContext('2d');
-    const X = (x) => (x + 150) * scale;
-    const Z = (z) => (z + 130) * scale;
-    g.fillStyle = '#1a1f27';
+    const X = (x) => (x + 270) * scale;
+    const Z = (z) => (z + 230) * scale;
+
+    g.fillStyle = '#121721';
     g.fillRect(0, 0, c.width, c.height);
-    g.fillStyle = '#2f5a2a';
+
+    // Bairros coloridos no fundo
+    g.fillStyle = 'rgba(47, 90, 42, 0.35)'; // Jardim
     g.fillRect(X(-45), Z(17), 56 * scale, 64 * scale);
-    g.fillStyle = '#6b5b45';
+    g.fillStyle = 'rgba(107, 91, 69, 0.35)'; // Largo Centro
     g.fillRect(X(-21), Z(-66), 42 * scale, 51 * scale);
-    g.fillStyle = '#7a3527';
+    g.fillStyle = 'rgba(122, 53, 39, 0.35)'; // Complexo Arena
     g.fillRect(X(14), Z(17), 32 * scale, 37 * scale);
-    g.fillStyle = '#4a4f57';
-    for (const r of ROADS) { const rr = roadRect(r); g.fillRect(X(rr.minX), Z(rr.minZ), (rr.maxX - rr.minX) * scale, (rr.maxZ - rr.minZ) * scale); }
-    g.fillStyle = '#8c8f96';
-    for (const b of BUILDINGS) g.fillRect(X(b.minX), Z(b.minZ), (b.maxX - b.minX) * scale, (b.maxZ - b.minZ) * scale);
+    g.fillStyle = 'rgba(15, 118, 110, 0.28)'; // Zona Comercial Norte
+    g.fillRect(X(-120), Z(-155), 180 * scale, 45 * scale);
+    g.fillStyle = 'rgba(30, 58, 138, 0.28)'; // Complexo Desportivo Sul
+    g.fillRect(X(-45), Z(110), 200 * scale, 45 * scale);
+
+    // Pavimentos
+    g.fillStyle = '#1c2430';
+    for (const b of [
+      [-160, -63, -150, -15], [-160, -63, 15, 150],
+      [63, 160, -150, -15], [63, 160, 15, 150],
+      [-47, 47, -150, -98], [-47, 47, 98, 150],
+      [-47, 47, -82, -15], [-47, 47, 15, 82],
+    ]) {
+      g.fillRect(X(b[0]), Z(b[2]), (b[1] - b[0]) * scale, (b[3] - b[2]) * scale);
+    }
+
+    // Estradas
+    g.fillStyle = '#374151';
+    for (const r of ROADS) {
+      const rr = roadRect(r);
+      g.fillRect(X(rr.minX), Z(rr.minZ), (rr.maxX - rr.minX) * scale, (rr.maxZ - rr.minZ) * scale);
+    }
+
+    // Edifícios
+    for (const b of BUILDINGS) {
+      g.fillStyle = b.interior ? '#f5b942' : '#8c8f96';
+      g.fillRect(X(b.minX), Z(b.minZ), (b.maxX - b.minX) * scale, (b.maxZ - b.minZ) * scale);
+    }
+
     this.mmBase = { canvas: c, scale, X, Z };
+  }
+
+  setWaypoint(wp) {
+    this.waypoint = wp;
   }
 
   drawMinimap(player, yaw, actors, race) {
     const g = this.mmCtx;
     const W = this.minimap.width;
-    const s = this.mmBase.scale * 0.55;
+    const s = this.mmBase.scale * 0.72;
     g.save();
     g.clearRect(0, 0, W, W);
     g.beginPath();
@@ -146,40 +189,71 @@ export class Hud {
     g.drawImage(this.mmBase.canvas, 0, 0);
     const { X, Z } = this.mmBase;
     const dot = (x, z, color, r) => { g.fillStyle = color; g.beginPath(); g.arc(X(x), Z(z), r, 0, Math.PI * 2); g.fill(); };
-    for (const a of actors.cars.values()) dot(a.root.position.x, a.root.position.z, '#f5b942', 3);
-    for (const a of actors.npcs.values()) dot(a.root.position.x, a.root.position.z, '#c4bbff', 2.4);
-    for (const a of actors.players.values()) dot(a.root.position.x, a.root.position.z, '#3ba7ff', 4);
-    for (const a of actors.bots.values()) dot(a.root.position.x, a.root.position.z, '#ffd98a', 4);
-    // pontos de interesse principais
-    g.fillStyle = '#ffffff';
-    g.font = `bold ${14}px Rajdhani, sans-serif`;
-    for (const id of ['arena_centro', 'mercado_balcao', 'oficina_kalunga_porta', 'largo_centro']) {
+
+    for (const a of actors.cars.values()) dot(a.root.position.x, a.root.position.z, '#f5b942', 3.5);
+    for (const a of actors.npcs.values()) dot(a.root.position.x, a.root.position.z, '#c4bbff', 2.8);
+    for (const a of actors.players.values()) dot(a.root.position.x, a.root.position.z, '#3ba7ff', 4.5);
+    for (const a of actors.bots.values()) dot(a.root.position.x, a.root.position.z, '#ffd98a', 4.5);
+
+    // Pontos de interesse principais
+    for (const id of [
+      'arena_centro', 'mercado_balcao', 'oficina_kalunga_porta', 'largo_centro',
+      'supermercado_kwanza_porta_poi', 'concessionario_kalunga_poi', 'aluguer_kianda_poi',
+      'imobiliaria_kianda_poi', 'centro_combate_poi', 'arena_tiro_poi', 'centro_corridas_poi'
+    ]) {
       const p = POIS.find((pp) => pp.id === id);
-      if (p) dot(p.x, p.z, '#f0444a', 4);
+      if (p) dot(p.x, p.z, '#f0444a', 4.5);
     }
+
+    // Traçado GPS até ao Waypoint
+    if (this.waypoint) {
+      g.strokeStyle = '#22c98b';
+      g.lineWidth = 3.5;
+      g.setLineDash([6, 4]);
+      g.beginPath();
+      g.moveTo(X(player.x), Z(player.z));
+      g.lineTo(X(this.waypoint.x), Z(this.waypoint.z));
+      g.stroke();
+      g.setLineDash([]);
+      dot(this.waypoint.x, this.waypoint.z, '#22c98b', 7);
+    }
+
     if (race) {
-      g.strokeStyle = 'rgba(245,185,66,0.8)';
+      g.strokeStyle = 'rgba(245,185,66,0.85)';
       g.lineWidth = 3;
       g.beginPath();
-      RACE_TRACK.racingLine.forEach(([x, z], i) => (i ? g.lineTo(X(x), Z(z)) : g.moveTo(X(x), Z(z))));
+      (race.trackDef?.racingLine ?? RACE_TRACK.racingLine).forEach(([x, z], i) => (i ? g.lineTo(X(x), Z(z)) : g.moveTo(X(x), Z(z))));
       g.stroke();
-      const next = RACE_TRACK.checkpoints[race.cp];
-      if (next) dot(next[0], next[1], '#f5b942', 7);
+      const next = (race.trackDef?.checkpoints ?? RACE_TRACK.checkpoints)[race.cp];
+      if (next) dot(next[0], next[1], '#f5b942', 7.5);
     }
     g.restore();
-    // seta do jogador (sempre ao centro)
+
+    // Seta do jogador (sempre ao centro)
     g.save();
     g.translate(W / 2, W / 2);
     g.rotate(Math.PI - player.heading + yaw);
     g.fillStyle = '#22c98b';
     g.beginPath();
-    g.moveTo(0, -8); g.lineTo(6, 6); g.lineTo(0, 3); g.lineTo(-6, 6); g.closePath();
+    g.moveTo(0, -9); g.lineTo(7, 7); g.lineTo(0, 3.5); g.lineTo(-7, 7); g.closePath();
     g.fill();
     g.restore();
+
     g.fillStyle = '#fff';
     g.font = 'bold 13px Rajdhani, sans-serif';
     g.textAlign = 'center';
     g.fillText('N', W / 2 + Math.sin(yaw) * (W / 2 - 12), W / 2 - Math.cos(yaw) * (W / 2 - 12) + 4);
+
+    if (this.waypoint) {
+      const d = Math.round(Math.hypot(player.x - this.waypoint.x, player.z - this.waypoint.z));
+      g.fillStyle = 'rgba(12, 16, 24, 0.85)';
+      g.fillRect(W / 2 - 38, W - 22, 76, 18);
+      g.strokeStyle = '#22c98b';
+      g.strokeRect(W / 2 - 38, W - 22, 76, 18);
+      g.fillStyle = '#22c98b';
+      g.font = 'bold 11px Rajdhani, sans-serif';
+      g.fillText(`${d} m GPS`, W / 2, W - 9);
+    }
   }
 
   // ---------------------------------------------------------------- avisos
@@ -407,5 +481,130 @@ export class Hud {
     el.classList.remove('hidden');
     $('res-ok').onclick = () => { el.classList.add('hidden'); onReturn(); };
     void me;
+  }
+
+  // ---------------------------------------------------------------- arena 1v1
+  ensureDuelHud() {
+    let dh = $('duel-hud');
+    if (!dh) {
+      dh = document.createElement('div');
+      dh.id = 'duel-hud';
+      dh.className = 'panel glass hidden';
+      dh.innerHTML = `
+        <div id="duel-header">
+          <span id="duel-title">ARENA 1V1</span>
+          <span id="duel-countdown" class="badge warn">PREPARAÇÃO</span>
+        </div>
+        <div class="duel-bars">
+          <div class="duel-fighter" id="df-me">
+            <div class="df-info"><b id="df-me-name">Tu</b><span id="df-me-hp-val">100 HP</span></div>
+            <div class="hp-track"><div class="hp-fill" id="df-me-hp-fill" style="width:100%"></div></div>
+          </div>
+          <div class="duel-vs">VS</div>
+          <div class="duel-fighter" id="df-opp">
+            <div class="df-info"><b id="df-opp-name">Oponente</b><span id="df-opp-hp-val">100 HP</span></div>
+            <div class="hp-track"><div class="hp-fill opp" id="df-opp-hp-fill" style="width:100%"></div></div>
+          </div>
+        </div>
+        <div id="duel-event" class="muted">A aguardar início do combate...</div>
+        <div id="duel-actions" class="duel-actions"></div>
+      `;
+      document.body.appendChild(dh);
+    }
+    return dh;
+  }
+
+  arenaSetup(match, spectator = false) {
+    const dh = this.ensureDuelHud();
+    dh.classList.remove('hidden');
+    $('duel-title').textContent = `${match.centerName} · ${match.mode === 'combate_1v1' ? 'Combate 1v1' : match.mode === 'tiro_1v1' ? 'Duelo de Tiro 1v1' : 'Sobrevivência'}`;
+    this.arenaState(match, 'Combate a iniciar em 3 segundos!');
+    if (spectator) {
+      $('duel-actions').innerHTML = '<div class="muted">Modo Espectador — a assistir ao duelo em directo</div>';
+    } else {
+      this.renderDuelActions(match.mode);
+    }
+  }
+
+  renderDuelActions(mode) {
+    const da = $('duel-actions');
+    if (mode === 'combate_1v1') {
+      da.innerHTML = `
+        <button class="btn good" data-da="strike">👊 Golpe Rápido (1)</button>
+        <button class="btn primary" data-da="heavy">💥 Golpe Forte (2)</button>
+        <button class="btn" data-da="guard">🛡️ Defesa (3)</button>
+      `;
+    } else {
+      da.innerHTML = `
+        <button class="btn good" data-da="strike">🎯 Disparo (1)</button>
+        <button class="btn primary" data-da="aimed_shot">⚡ Mira Táctica (2)</button>
+        <button class="btn" data-da="guard">🛡️ Barricada (3)</button>
+        <button class="btn" data-da="reload">🔄 Recarregar (R)</button>
+      `;
+    }
+    da.querySelectorAll('[data-da]').forEach((b) => {
+      b.onclick = () => this.net.send({ t: 'arena_action', action: b.dataset.da });
+    });
+  }
+
+  arenaState(match, lastEvent = null) {
+    const dh = this.ensureDuelHud();
+    const me = match.fighters.find((f) => f.id === this.you?.id) ?? match.fighters[0];
+    const opp = match.fighters.find((f) => f.id !== me.id) ?? match.fighters[1];
+
+    $('df-me-name').textContent = me.name;
+    $('df-me-hp-val').textContent = `${me.hp} HP${match.mode !== 'combate_1v1' ? ` · 🔫 ${me.ammo}/${me.maxAmmo}` : ''}`;
+    $('df-me-hp-fill').style.width = `${Math.max(0, me.hp)}%`;
+
+    if (opp) {
+      $('df-opp-name').textContent = opp.name;
+      $('df-opp-hp-val').textContent = `${opp.hp} HP`;
+      $('df-opp-hp-fill').style.width = `${Math.max(0, opp.hp)}%`;
+    }
+
+    if (lastEvent) $('duel-event').textContent = lastEvent;
+    if (match.status === 'active') {
+      $('duel-countdown').className = 'badge good';
+      $('duel-countdown').textContent = 'EM COMBATE';
+    } else {
+      $('duel-countdown').className = 'badge warn';
+      $('duel-countdown').textContent = 'PREPARAÇÃO';
+    }
+  }
+
+  arenaResult(record, hash, onReturn) {
+    const dh = $('duel-hud');
+    if (dh) dh.classList.add('hidden');
+    const el = $('result-modal');
+    const won = record.winnerId === this.you?.id;
+    const split = record.split ?? calculatePrizeSplit(record.stakeKz, 2, 20);
+
+    el.innerHTML = `
+      <h2>${won ? '🏆 Vitória no Duelo!' : record.winnerId ? 'Duelo Concluído' : 'Empate / Sem Vencedor'}</h2>
+      <p class="muted">${esc(record.centerName)} · Modo ${record.mode}</p>
+      <div class="stat-grid" style="margin:10px 0">
+        ${record.fighters.map((f) => `
+          <div class="stat">
+            <b>${esc(f.name)}</b>
+            <span>${f.hp > 0 ? `Restam ${f.hp} HP` : 'Eliminado'}</span>
+            <small class="muted">Pontos: ${f.score} · Golpes: ${f.hitsLanded}</small>
+          </div>
+        `).join('')}
+      </div>
+      ${record.stakeKz > 0 ? `
+        <div style="background:rgba(34,201,139,.12);border:1px solid rgba(34,201,139,.35);padding:10px;border-radius:10px;margin:10px 0">
+          <b>Prémio Liquidado (80/20):</b><br>
+          Vencedor: <b>${kz(split.prizeKz)} demo (80%)</b> · Taxa Arena: <b>${kz(split.feeKz)} demo (20%)</b>
+        </div>
+      ` : '<p class="muted">Combate de treino amigável (sem apostas de saldo demo).</p>'}
+      <p class="muted" style="font-size:12px">Registo autoritativo com verificação criptográfica SHA-256:</p>
+      <p class="mono">${esc(hash)}</p>
+      <button class="primary" id="duel-res-ok">Continuar no Mundo</button>
+    `;
+    el.classList.remove('hidden');
+    el.querySelector('#duel-res-ok').onclick = () => {
+      el.classList.add('hidden');
+      onReturn?.();
+    };
   }
 }

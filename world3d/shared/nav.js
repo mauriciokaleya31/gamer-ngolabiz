@@ -20,14 +20,14 @@ const SIDEWALK_STEP = 7;
 const GRID_STEP = 5;
 
 export const BLOCKS = Object.freeze([
-  { id: 'oeste_norte', minX: -128, maxX: -63, minZ: -108, maxZ: -15 },
-  { id: 'oeste_sul', minX: -128, maxX: -63, minZ: 15, maxZ: 108 },
+  { id: 'oeste_norte', minX: -156, maxX: -63, minZ: -146, maxZ: -15 },
+  { id: 'oeste_sul', minX: -156, maxX: -63, minZ: 15, maxZ: 146 },
   { id: 'centro_norte', minX: -47, maxX: 47, minZ: -82, maxZ: -15 },
   { id: 'centro_sul', minX: -47, maxX: 47, minZ: 15, maxZ: 82 },
-  { id: 'este_norte', minX: 63, maxX: 128, minZ: -108, maxZ: -15 },
-  { id: 'este_sul', minX: 63, maxX: 128, minZ: 15, maxZ: 108 },
-  { id: 'faixa_norte', minX: -47, maxX: 47, minZ: -108, maxZ: -98 },
-  { id: 'faixa_sul', minX: -47, maxX: 47, minZ: 98, maxZ: 108 },
+  { id: 'este_norte', minX: 63, maxX: 156, minZ: -146, maxZ: -15 },
+  { id: 'este_sul', minX: 63, maxX: 156, minZ: 15, maxZ: 146 },
+  { id: 'faixa_norte', minX: -47, maxX: 47, minZ: -146, maxZ: -98 },
+  { id: 'faixa_sul', minX: -47, maxX: 47, minZ: 98, maxZ: 146 },
 ]);
 
 export function buildNavGraph() {

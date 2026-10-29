@@ -18,8 +18,10 @@ import { DemoLedger } from './economy/ledger.js';
 import { RaceManager, RaceError } from './competition/race.js';
 import { defaultAdminConfig, mergeAdminConfig } from './config.js';
 import { ExpressionService } from './expressions.js';
-import { ShopService, GARAGE_SPAWN, SHOP_LOCATIONS } from './shop.js';
+import { ShopService, GARAGE_SPAWN, RENTAL_SPAWN, SHOP_LOCATIONS, ShopError } from './shop.js';
+import { ArenaModesManager, ArenaError, COMPETITION_CENTERS } from './competition/arenaModes.js';
 import { EMOTE_LIMITS } from '../../shared/emotes.js';
+import { PROPERTIES_CATALOG } from '../../shared/catalog.js';
 
 const POI_NAME = new Map(POIS.map((p) => [p.id, p.name]));
 const MAX_SPEED = { foot: 9.5, car: 62, moto: 66 };
@@ -75,6 +77,12 @@ export class World {
     });
     this.expressions = new ExpressionService({ now, overrides: cfg.emotes.overrides });
     this.shop = new ShopService({ store, ledger: this.ledger, overrides: cfg.catalog.overrides });
+    this.arena = new ArenaModesManager({
+      store, ledger: this.ledger, now,
+      send: (pid, msg) => this.sendTo(pid, msg),
+      onTeleport: (pid, x, z, h) => { this.teleport(pid, x, z); const pl = this.players.get(pid); if (pl) { pl.h = h ?? pl.h; this.sendTo(pid, { t: 'correct', x, z, h: pl.h, diag: true }); } },
+      config: { feePct: cfg.competitions.feePct },
+    });
     this.players = new Map();
     this.parties = new Map();
     this.vehicles = new Map(PARKED_VEHICLES.filter((v) => v.usable).map((v) => [v.id, { ...v, occupant: null, color: null }]));
@@ -182,6 +190,7 @@ export class World {
     this.traffic.tick(dt, now, hour, { players, pedestrians });
     this.npcSim.tick(now, players);
     this.races.tick(dt);
+    this.arena.tick();
     this.tickSimCompetitors(dt, now);
 
     const lightsOn = this.clock.publicState(now).light.streetLights > 0.4 || this.weather.state.rain > 0.3 || this.weather.state.fog > 0.4;
@@ -270,6 +279,12 @@ export class World {
       emotes: this.expressions.publicList(),
       prefs: this.store.getPrefs(p.id),
       shops: Object.fromEntries(Object.entries(SHOP_LOCATIONS).map(([k, v]) => [k, { name: v.name, poi: v.poi }])),
+      rentals: this.shop.publicRentals(),
+      properties: this.shop.publicProperties(),
+      myRentals: this.store.activeRentalsOf(p.id),
+      myProperties: this.store.propertiesOf(p.id),
+      consumables: this.store.consumablesOf(p.id),
+      feePct: this.adminConfig.competitions.feePct,
       trainingBots: this.adminConfig.competitions.trainingBots.map((b) => ({ id: b.id, name: b.name, difficulty: b.difficulty, vehicle: b.vehicle })),
       features: { raceEnabled: this.adminConfig.competitions.raceEnabled, stakesEnabled: this.adminConfig.competitions.stakesEnabled, diagnostics: this.env.development, aiDialogue: this.dialogue.config.aiEnabled && this.dialogue.provider.available() },
       serverNowMs: this.now(),
@@ -283,9 +298,11 @@ export class World {
     const p = this.players.get(playerId);
     if (!p) return;
     this.races.onDisconnect(playerId);
+    this.arena.onDisconnect(playerId);
     if (p.vehicleId) this.releaseVehicle(p);
     if (p.partyId) this.leaveParty(p);
     if (this.vehicles.delete(`pv_${playerId}`)) this.broadcastVehicles();
+    if (this.vehicles.delete(`rv_${playerId}`)) this.broadcastVehicles();
     this.players.delete(playerId);
     this.broadcastSystem(`${p.displayName} saiu.`, playerId);
   }
@@ -416,9 +433,71 @@ export class World {
             const targetShop = it?.kind === 'vehicle' ? 'dealership' : 'wardrobe';
             if (!this.shop.nearShop(p, targetShop)) this.travelToPlace(p, targetShop);
           }
-          const r = this.shop.buy(p, m.itemId);
-          return this.sendTo(p.id, { t: 'shop_result', ok: true, itemId: r.item.id, owned: this.shop.owned(p.id), wallet: this.ledger.wallet(p.id) });
+          const r = this.shop.buy(p, m.itemId, { reqId: m.reqId });
+          return this.sendTo(p.id, { t: 'shop_result', ok: true, itemId: r.item.id, owned: this.shop.owned(p.id), wallet: this.ledger.wallet(p.id), consumables: r.consumables ?? undefined });
         }
+        case 'consume': {
+          const id = String(m.itemId);
+          const have = this.store.consumablesOf(p.id)[id] ?? 0;
+          if (have <= 0) throw new ShopError('Não tens este artigo no inventário.', 'none');
+          const consumables = this.store.addConsumable(p.id, id, -1);
+          this.store.audit('consume', { playerId: p.id, itemId: id });
+          return this.sendTo(p.id, { t: 'inventory', consumables, used: id });
+        }
+        case 'vehicle_rent': {
+          if (m.autoTravel && !this.shop.nearShop(p, 'rental')) this.travelToPlace(p, 'rental');
+          const r = this.shop.rentVehicle(p, m.rentalId, this.now());
+          const id = `rv_${p.id}`;
+          const old = this.vehicles.get(id);
+          if (old?.occupant && old.occupant !== p.id) throw new ShopError('O teu veículo alugado está em uso.', 'occupied');
+          if (p.vehicleId === id) this.releaseVehicle(p);
+          this.vehicles.set(id, { id, kind: r.def.vehicleClass, itemId: r.def.vehicleItemId, paint: null, rims: null, owner: p.id, rentalContract: r.contractId, x: RENTAL_SPAWN.x, z: RENTAL_SPAWN.z, heading: RENTAL_SPAWN.heading, occupant: null, usable: true });
+          this.broadcastVehicles();
+          return this.sendTo(p.id, { t: 'rental_result', ok: true, contractId: r.contractId, rentals: r.rentals, wallet: this.ledger.wallet(p.id), message: `${r.def.name} pronto à porta do Rent-a-Car (${r.def.durationMinutes} min).` });
+        }
+        case 'vehicle_return': {
+          const r = this.shop.returnVehicle(p, m.contractId);
+          const id = `rv_${p.id}`;
+          if (p.vehicleId === id) this.releaseVehicle(p);
+          if (this.vehicles.delete(id)) this.broadcastVehicles();
+          return this.sendTo(p.id, { t: 'rental_result', ok: true, rentals: r.rentals, wallet: this.ledger.wallet(p.id), message: 'Veículo devolvido. Contrato encerrado.' });
+        }
+        case 'property_acquire': {
+          if (m.autoTravel && !this.shop.nearShop(p, 'realestate')) this.travelToPlace(p, 'realestate');
+          const r = this.shop.acquireProperty(p, m.propertyId, m.mode === 'rent' ? 'rent' : 'buy', this.now());
+          return this.sendTo(p.id, { t: 'property_result', ok: true, properties: r.properties, wallet: this.ledger.wallet(p.id), message: `${r.mode === 'buy' ? 'Compraste' : 'Arrendaste'} ${r.prop.name}. As chaves são tuas!` });
+        }
+        case 'property_visit': {
+          const prop = PROPERTIES_CATALOG.find((x) => x.id === String(m.propertyId));
+          if (!prop) throw new ShopError('Imóvel inexistente.', 'unavailable');
+          const mine = this.store.propertiesOf(p.id, this.now()).some((x) => x.propertyId === prop.id);
+          if (!mine && !m.preview) throw new ShopError('Só podes entrar em imóveis que compraste ou arrendaste (ou pede uma visita na Imobiliária).', 'not_owner');
+          this.teleport(p.id, prop.spawn[0], prop.spawn[1]);
+          return this.sendTo(p.id, { t: 'correct', x: prop.spawn[0], z: prop.spawn[1], h: Math.PI / 2, diag: true });
+        }
+        case 'arena_state': return this.sendTo(p.id, { t: 'arena_overview', state: this.arena.publicState() });
+        case 'arena_create': {
+          this.assertArenaMode(m.mode, Number(m.stakeKz) || 0);
+          const lobby = this.arena.createLobby(p, { mode: m.mode, centerId: m.centerId, stakeKz: m.stakeKz });
+          this.broadcastArenaOverview();
+          return this.sendTo(p.id, { t: 'system', text: `Desafio ${lobby.mode} criado (${lobby.stakeKz ? `${lobby.stakeKz} Kz demo` : 'gratuito'}). À espera de adversário…` });
+        }
+        case 'arena_join': {
+          this.arena.joinLobby(p, m.lobbyId);
+          return this.broadcastArenaOverview();
+        }
+        case 'arena_cancel': {
+          for (const [id, l] of this.arena.lobbies) if (l.host.id === p.id) this.arena.lobbies.delete(id);
+          return this.broadcastArenaOverview();
+        }
+        case 'arena_train': {
+          this.assertArenaMode(m.mode, 0);
+          if (p.vehicleId) this.releaseVehicle(p);
+          this.arena.startInstantMatch(p, { mode: m.mode, botId: m.botId });
+          return this.broadcastArenaOverview();
+        }
+        case 'arena_spectate': return void this.arena.spectate(p, m.matchId);
+        case 'arena_action': return void this.arena.onAction(p.id, { action: String(m.action ?? 'strike') });
         case 'garage_spawn': {
           if (m.autoTravel && !this.shop.nearShop(p, 'garage')) this.travelToPlace(p, 'garage');
           return this.onGarageSpawn(p, m);
@@ -597,19 +676,32 @@ export class World {
     const to = this.players.get(String(m.to));
     if (!to) throw new RaceError('Jogador offline.', 'offline');
     if (Math.hypot(to.x - p.x, to.z - p.z) > 60) throw new RaceError('Aproxima-te do jogador para o desafiar (60 m).', 'far');
-    this.races.challenge(p, to, { vehicle: m.vehicle, stake });
+    this.races.challenge(p, to, { vehicle: m.vehicle, stake, trackId: String(m.trackId ?? 'circuito_anel_kianda') });
   }
 
   onTrainRace(p, m) {
     if (!this.adminConfig.competitions.raceEnabled) throw new RaceError('Corridas desactivadas pelo administrador.', 'disabled');
     const bot = this.adminConfig.competitions.trainingBots.find((b) => b.id === m.botId && b.enabled !== false);
     if (p.vehicleId) this.releaseVehicle(p);
-    this.races.startTraining(p, bot, ['car', 'moto'].includes(m.vehicle) ? m.vehicle : 'car');
+    this.races.startTraining(p, bot, ['car', 'moto'].includes(m.vehicle) ? m.vehicle : 'car', String(m.trackId ?? 'circuito_anel_kianda'));
   }
 
   /** Difunde um evento aos jogadores próximos (incluindo o próprio). */
   broadcastNear(p, msg, radius = EMOTE_LIMITS.broadcastRadius) {
     for (const o of this.players.values()) if (Math.hypot(o.x - p.x, o.z - p.z) <= radius) this.sendTo(o.id, msg);
+  }
+
+  assertArenaMode(mode, stake) {
+    const c = this.adminConfig.competitions;
+    const flag = { combate_1v1: 'combatEnabled', tiro_1v1: 'shootingEnabled', sobrevivencia: 'survivalEnabled' }[mode];
+    if (!flag) throw new ArenaError('Modo de competição inválido.', 'bad_mode');
+    if (c[flag] === false) throw new ArenaError('Este modo está desactivado pelo administrador.', 'disabled');
+    if (stake > 0 && !c.stakesEnabled) throw new ArenaError('Entradas com saldo demo desactivadas.', 'disabled');
+  }
+
+  broadcastArenaOverview() {
+    const state = this.arena.publicState();
+    for (const o of this.players.values()) this.sendTo(o.id, { t: 'arena_overview', state });
   }
 
   /** Deslocação rápida para lojas, casa, arena ou largo. */
@@ -623,6 +715,17 @@ export class World {
       betting: { x: 30, z: 62, h: 0 },
       home: { x: -86, z: -15, h: 0 },
       plaza: { x: 0, z: -28, h: Math.PI },
+      supermarket: { x: -100, z: -147, h: 0 },
+      rental: { x: 160, z: -30, h: -Math.PI / 2 },
+      realestate: { x: -4, z: -147, h: 0 },
+      dealership2: { x: 160, z: -83, h: -Math.PI / 2 },
+      combat: { x: -23, z: 147, h: Math.PI },
+      shooting: { x: 26, z: 147, h: Math.PI },
+      race_center: { x: 135, z: 147, h: Math.PI },
+      maianga: { x: -170, z: 0, h: 0 },
+      talatona: { x: 0, z: 160, h: Math.PI },
+      industrial: { x: 170, z: 0, h: 0 },
+      marginal: { x: 0, z: -160, h: 0 },
     };
     const d = DESTS[place];
     if (!d) return;
@@ -690,6 +793,7 @@ export class World {
     if (JSON.stringify(before.clock) !== JSON.stringify(next.clock)) this.clock.configure(next.clock);
     this.ledger.feePct = next.competitions.feePct;
     this.races.config.feePct = next.competitions.feePct;
+    this.arena.config.feePct = next.competitions.feePct;
     this.store.audit('admin_config', { sections: Object.keys(patch ?? {}) });
     return next;
   }
@@ -704,6 +808,8 @@ export class World {
       traffic: { cars: this.traffic.cars.length, closure: this.traffic.closure },
       dialogue: this.dialogue.publicMetrics(),
       races: this.races.publicState(),
+      arena: (() => { const s = this.arena.publicState(); return { openLobbies: s.openLobbies.length, activeMatches: s.activeMatches.length, feePct: s.feePct, recent: s.recentResults.slice(0, 5) }; })(),
+      centers: Object.keys(COMPETITION_CENTERS),
       process: { rssMb: Math.round(mem.rss / 1048576), heapMb: Math.round(mem.heapUsed / 1048576), cpuPct: this.metrics.cpuPct },
       network: { bytesOut: this.metrics.bytesOut, msgsIn: this.metrics.msgsIn },
       clock: this.clock.publicState(),

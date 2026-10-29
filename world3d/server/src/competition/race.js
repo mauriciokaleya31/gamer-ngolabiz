@@ -10,7 +10,7 @@
  * participam em corridas gratuitas (stake = 0).
  */
 import { createHash, randomUUID } from 'node:crypto';
-import { RACE_TRACK, trackLength } from '../../../shared/zone.js';
+import { RACE_TRACK, RACE_TRACKS, trackLength } from '../../../shared/zone.js';
 import { ALLOWED_STAKES_KZ } from '../economy/ledger.js';
 import { TrainingBotDriver } from './trainingBot.js';
 
@@ -66,7 +66,7 @@ export class RaceManager {
 
   inCompetition(playerId) { return this.playerRace.has(playerId); }
 
-  challenge(from, to, { vehicle = 'car', stake = 0 } = {}) {
+  challenge(from, to, { vehicle = 'car', stake = 0, trackId = RACE_TRACK.id } = {}) {
     if (from.id === to.id) throw new RaceError('Não te podes desafiar a ti próprio.', 'self');
     if (!['car', 'moto'].includes(vehicle)) throw new RaceError('Veículo inválido.', 'vehicle');
     stake = Number(stake) || 0;
@@ -81,7 +81,7 @@ export class RaceManager {
     for (const c of this.challenges.values()) {
       if (c.status === 'pending' && c.from.id === from.id && c.to.id === to.id) throw new RaceError('Já enviaste um desafio a este jogador.', 'duplicate');
     }
-    const c = { id: `chl_${randomUUID().slice(0, 8)}`, from: { id: from.id, name: from.displayName }, to: { id: to.id, name: to.displayName }, vehicle, stake, status: 'pending', createdAt: this.now(), expiresAt: this.now() + this.config.challengeTtlSec * 1000 };
+    const c = { id: `chl_${randomUUID().slice(0, 8)}`, from: { id: from.id, name: from.displayName }, to: { id: to.id, name: to.displayName }, vehicle, stake, trackId: RACE_TRACKS[trackId] ? trackId : RACE_TRACK.id, status: 'pending', createdAt: this.now(), expiresAt: this.now() + this.config.challengeTtlSec * 1000 };
     this.challenges.set(c.id, c);
     this.send(to.id, { t: 'challenge_in', challenge: c });
     this.send(from.id, { t: 'challenge_update', challenge: c });
@@ -99,20 +99,21 @@ export class RaceManager {
     return this.startRace([
       { id: c.from.id, name: c.from.name, isBot: false, vehicle: c.vehicle },
       { id: c.to.id, name: c.to.name, isBot: false, vehicle: c.vehicle },
-    ], { stake: c.stake, origin: c.id });
+    ], { stake: c.stake, origin: c.id, trackId: c.trackId });
   }
 
-  startTraining(player, botDef, vehicle = 'car') {
+  startTraining(player, botDef, vehicle = 'car', trackId = RACE_TRACK.id) {
     if (this.inCompetition(player.id)) throw new RaceError('Já estás numa competição.', 'busy');
     if (!botDef) throw new RaceError('Bot de treino inexistente.', 'no_bot');
     if ([...this.races.values()].some((r) => r.participants.some((p) => p.id === botDef.id))) throw new RaceError('Esse bot de treino está ocupado.', 'busy');
     return this.startRace([
       { id: player.id, name: player.displayName, isBot: false, vehicle },
       { id: botDef.id, name: `${botDef.name} (Bot de treino)`, isBot: true, vehicle: botDef.vehicle, botDef },
-    ], { stake: 0, origin: 'treino' });
+    ], { stake: 0, origin: 'treino', trackId });
   }
 
-  startRace(entrants, { stake, origin }) {
+  startRace(entrants, { stake, origin, trackId = RACE_TRACK.id }) {
+    const T = RACE_TRACKS[trackId] ?? RACE_TRACK;
     if (stake > 0 && entrants.some((e) => e.isBot)) throw new RaceError('Bots não podem participar em competições com saldo.', 'bot_paid');
     const id = `race_${randomUUID()}`;
     const now = this.now();
@@ -127,12 +128,12 @@ export class RaceManager {
       }
     }
     const race = {
-      id, origin, stake, track: RACE_TRACK.id, phase: 'countdown', createdAt: now,
+      id, origin, stake, track: T.id, trackDef: T, phase: 'countdown', createdAt: now,
       goAt: now + this.config.countdownSec * 1000,
       participants: entrants.map((e, i) => ({
-        id: e.id, name: e.name, isBot: e.isBot, vehicle: e.vehicle, grid: RACE_TRACK.grid[i],
+        id: e.id, name: e.name, isBot: e.isBot, vehicle: e.vehicle, grid: T.grid[i],
         nextCp: 0, cpTimes: [], last: null, violations: 0, status: 'racing', finishMs: null,
-        bot: e.isBot ? new TrainingBotDriver(e.botDef, RACE_TRACK.grid[i]) : null,
+        bot: e.isBot ? new TrainingBotDriver(e.botDef, T.grid[i], T) : null,
       })),
       firstFinishAt: null,
     };
@@ -142,7 +143,7 @@ export class RaceManager {
     this.npcSim?.pushEvent({ type: 'race_start', id });
     const setup = {
       t: 'race_setup', raceId: id, goAt: race.goAt, stake,
-      track: { id: RACE_TRACK.id, name: RACE_TRACK.name, checkpoints: RACE_TRACK.checkpoints, radius: RACE_TRACK.checkpointRadius, heading: RACE_TRACK.start.heading },
+      track: { id: T.id, name: T.name, checkpoints: T.checkpoints, racingLine: T.racingLine, radius: T.checkpointRadius, heading: T.start.heading },
       participants: race.participants.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot, vehicle: p.vehicle, grid: p.grid })),
     };
     for (const p of race.participants) {
@@ -177,10 +178,10 @@ export class RaceManager {
       if (p.violations >= this.config.maxViolations) this.disqualify(race, p, 'velocidade impossível / teletransporte');
       return;
     }
-    const cps = RACE_TRACK.checkpoints;
+    const cps = race.trackDef.checkpoints;
     while (p.nextCp < cps.length) {
       const [cx, cz] = cps[p.nextCp];
-      if (segPointDist(p.last.x, p.last.z, x, z, cx, cz) > RACE_TRACK.checkpointRadius) break;
+      if (segPointDist(p.last.x, p.last.z, x, z, cx, cz) > race.trackDef.checkpointRadius) break;
       p.cpTimes.push(t - race.goAt);
       p.nextCp++;
       if (!p.isBot) this.send(p.id, { t: 'race_progress', raceId, checkpoint: p.nextCp, total: cps.length, ms: t - race.goAt });
@@ -261,7 +262,7 @@ export class RaceManager {
     const record = {
       raceId: race.id,
       track: race.track,
-      trackChecksum: createHash('sha256').update(JSON.stringify(RACE_TRACK.checkpoints)).digest('hex').slice(0, 16),
+      trackChecksum: createHash('sha256').update(JSON.stringify(race.trackDef.checkpoints)).digest('hex').slice(0, 16),
       origin: race.origin,
       stake: race.stake,
       currency: 'KZD',

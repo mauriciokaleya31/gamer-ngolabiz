@@ -94,6 +94,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($action === 'competitions') {
             $res = world3d_api('PUT', '/admin/config', ['competitions' => [
                 'raceEnabled' => w3d_bool($_POST['raceEnabled'] ?? '0'),
+                'combatEnabled' => w3d_bool($_POST['combatEnabled'] ?? '0'),
+                'shootingEnabled' => w3d_bool($_POST['shootingEnabled'] ?? '0'),
+                'survivalEnabled' => w3d_bool($_POST['survivalEnabled'] ?? '0'),
                 'stakesEnabled' => w3d_bool($_POST['stakesEnabled'] ?? '0'),
                 'feePct' => max(0, min(30, (float)$_POST['feePct'])),
             ]], $token);
@@ -237,20 +240,99 @@ $tabs = ['estado' => 'Estado e métricas', 'npcs' => 'População de NPCs', 'lis
         </div>
         <button style="margin-top:12px;background:#F0444A;color:#fff;border:0;border-radius:8px;padding:9px 16px;font-weight:800;">Guardar ambiente</button>
     </form>
-<?php elseif ($tab === 'competicoes'): $cp = $cfg['competitions']; ?>
+<?php elseif ($tab === 'competicoes'):
+    $cp = $cfg['competitions'] ?? [];
+    $arenaMatches = $token ? (world3d_api('GET', '/admin/arena-matches?limit=30', null, $token)['data']['rows'] ?? []) : [];
+?>
     <form method="post" <?php echo $card; ?>>
         <input type="hidden" name="csrf" value="<?php echo $h($csrf); ?>"><input type="hidden" name="action" value="competitions">
-        <p style="color:var(--text-muted);font-size:.82rem;">O Mundo 3D só movimenta <strong>saldo de demonstração</strong>. Dinheiro real está bloqueado no código até validação jurídica e integração financeira aprovada.</p>
-        <label style="color:#dfe5ee;"><input type="checkbox" name="raceEnabled" value="1" <?php echo $cp['raceEnabled'] ? 'checked' : ''; ?>> Corridas activas</label><br>
-        <label style="color:#dfe5ee;"><input type="checkbox" name="stakesEnabled" value="1" <?php echo $cp['stakesEnabled'] ? 'checked' : ''; ?>> Entradas com saldo demo</label><br>
-        <label style="color:#dfe5ee;">Taxa da plataforma (%) <input type="number" step="0.5" name="feePct" value="<?php echo (float)$cp['feePct']; ?>" <?php echo $inp; ?>></label>
-        <div><button style="margin-top:12px;background:#F0444A;color:#fff;border:0;border-radius:8px;padding:9px 16px;font-weight:800;">Guardar</button></div>
+        <h3 style="color:#fff;font-size:1.05rem;">Configuração de Competições & Arenas 1v1</h3>
+        <p style="color:var(--text-muted);font-size:.82rem;">O Mundo 3D movimenta <strong>saldo de demonstração (Kz demo)</strong>. O modelo financeiro oficial reparte o pote de apostas em <strong>80% para o vencedor</strong> e <strong>20% de comissão da plataforma</strong> com registo de hash criptográfico SHA-256 autoritativo.</p>
+        
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:12px 0;">
+            <label style="color:#dfe5ee;"><input type="checkbox" name="raceEnabled" value="1" <?php echo ($cp['raceEnabled'] ?? true) ? 'checked' : ''; ?>> 🏎️ Corridas activas</label>
+            <label style="color:#dfe5ee;"><input type="checkbox" name="combatEnabled" value="1" <?php echo ($cp['combatEnabled'] ?? true) ? 'checked' : ''; ?>> 🥊 Combate 1v1 activo</label>
+            <label style="color:#dfe5ee;"><input type="checkbox" name="shootingEnabled" value="1" <?php echo ($cp['shootingEnabled'] ?? true) ? 'checked' : ''; ?>> 🎯 Duelo de Tiro 1v1 activo</label>
+            <label style="color:#dfe5ee;"><input type="checkbox" name="survivalEnabled" value="1" <?php echo ($cp['survivalEnabled'] ?? true) ? 'checked' : ''; ?>> 🛡️ Sobrevivência activa</label>
+            <label style="color:#dfe5ee;"><input type="checkbox" name="stakesEnabled" value="1" <?php echo ($cp['stakesEnabled'] ?? true) ? 'checked' : ''; ?>> 💰 Entradas com saldo demo</label>
+            <label style="color:#dfe5ee;">Taxa da plataforma (%) <br><input type="number" step="0.5" name="feePct" value="<?php echo (float)($cp['feePct'] ?? 20); ?>" <?php echo $inp; ?> style="width:120px;"></label>
+        </div>
+        <div><button style="margin-top:12px;background:#F0444A;color:#fff;border:0;border-radius:8px;padding:9px 16px;font-weight:800;">Guardar regras de competição</button></div>
     </form>
+
+    <div <?php echo $card; ?>>
+        <h3 style="color:#fff;font-size:1.05rem;">🏟️ Centros Físicos de Competição no Mapa</h3>
+        <p style="color:var(--text-muted);font-size:.82rem;">Espaços dedicados com interiores 3D completos, regras físicas de colisão e modos dedicados.</p>
+        <table style="width:100%;color:#dfe5ee;font-size:.85rem;border-collapse:collapse;">
+            <tr style="color:var(--text-muted);text-align:left;border-bottom:1px solid #273142;">
+                <th style="padding:6px;">Centro</th><th>Bairro</th><th>Coordenadas</th><th>Modos Suportados</th><th>Divisão do Pote</th><th>Estado</th>
+            </tr>
+            <tr style="border-bottom:1px solid #273142;">
+                <td style="padding:8px;font-weight:700;">🥊 Centro de Combate 1v1</td>
+                <td>Complexo Talatona Sul</td>
+                <td><code>X: 45, Z: 145</code></td>
+                <td>Luta corpo a corpo 1v1, Boxe, Golpes e Defesa</td>
+                <td><span style="color:#22C98B;font-weight:700;">80% Vencedor</span> / 20% Casa</td>
+                <td><span class="badge text-bg-success">Activo</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid #273142;">
+                <td style="padding:8px;font-weight:700;">🎯 Arena de Tiro Táctico</td>
+                <td>Complexo Talatona Sul</td>
+                <td><code>X: 160, Z: 140</code></td>
+                <td>Duelo de Precisão 1v1 & Modo Sobrevivência</td>
+                <td><span style="color:#22C98B;font-weight:700;">80% Vencedor</span> / 20% Casa</td>
+                <td><span class="badge text-bg-success">Activo</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid #273142;">
+                <td style="padding:8px;font-weight:700;">🏎️ Autódromo & Centro de Corridas</td>
+                <td>Zona Desportiva Oeste</td>
+                <td><code>X: -150, Z: 135</code></td>
+                <td>Circuito do Anel (12 CPs) & Grande Circuito Urbano (24 CPs)</td>
+                <td><span style="color:#22C98B;font-weight:700;">80% Vencedor</span> / 20% Casa</td>
+                <td><span class="badge text-bg-success">Activo</span></td>
+            </tr>
+            <tr>
+                <td style="padding:8px;font-weight:700;">🏆 Casa de Apostas Kianda</td>
+                <td>Kianda Centro</td>
+                <td><code>X: 18, Z: 22</code></td>
+                <td>Mural de Desafios, Lobbies Abertos e Transmissões ao Vivo</td>
+                <td>Configurável por duelo</td>
+                <td><span class="badge text-bg-success">Activo</span></td>
+            </tr>
+        </table>
+    </div>
+
+    <div <?php echo $card; ?>>
+        <h3 style="color:#fff;font-size:1.05rem;">📜 Auditoria de Batalhas & Duelos Recentes (80/20)</h3>
+        <p style="color:var(--text-muted);font-size:.82rem;">Histórico das últimas batalhas resolvidas com prova criptográfica SHA-256 e liquidação financeira.</p>
+        <?php if (empty($arenaMatches)): ?>
+            <p style="color:var(--text-muted);font-style:italic;">Ainda não há duelos registados nesta sessão.</p>
+        <?php else: ?>
+            <table style="width:100%;color:#dfe5ee;font-size:.82rem;border-collapse:collapse;">
+                <tr style="color:var(--text-muted);text-align:left;border-bottom:1px solid #273142;">
+                    <th style="padding:6px;">Data</th><th>ID</th><th>Centro</th><th>Modo</th><th>Aposta</th><th>Prémio (80%)</th><th>Taxa (20%)</th><th>Hash SHA-256</th>
+                </tr>
+                <?php foreach ($arenaMatches as $m): $rec = $m['record'] ?? []; $split = $rec['split'] ?? ['prizeKz' => 0, 'feeKz' => 0]; ?>
+                    <tr style="border-bottom:1px solid #273142;">
+                        <td style="padding:6px;white-space:nowrap;"><?php echo date('d/m H:i:s', (int)(($m['createdAt'] ?? 0) / 1000)); ?></td>
+                        <td><code><?php echo $h(substr($m['matchId'] ?? '', 0, 14)); ?></code></td>
+                        <td><?php echo $h($rec['centerName'] ?? ($m['centerId'] ?? '')); ?></td>
+                        <td><span class="badge text-bg-secondary"><?php echo $h($m['mode'] ?? ''); ?></span></td>
+                        <td><b><?php echo number_format((float)($m['stakeKz'] ?? 0), 0, ',', '.'); ?> Kz</b></td>
+                        <td style="color:#22C98B;font-weight:700;"><?php echo number_format((float)($split['prizeKz'] ?? 0), 0, ',', '.'); ?> Kz</td>
+                        <td style="color:var(--text-muted);"><?php echo number_format((float)($split['feeKz'] ?? 0), 0, ',', '.'); ?> Kz</td>
+                        <td><code style="font-size:.72rem;"><?php echo $h(substr($m['hash'] ?? '', 0, 18)); ?>…</code></td>
+                    </tr>
+                <?php endforeach; ?>
+            </table>
+        <?php endif; ?>
+    </div>
+
     <div <?php echo $card; ?>>
         <h3 style="color:#fff;font-size:1.05rem;">Bots de treino</h3>
         <p style="color:var(--text-muted);font-size:.82rem;">Identificados como bots, só em corridas gratuitas, sem percentagem de vitória programada (conduzem a velocidade fixa por dificuldade; o servidor valida o resultado como para humanos).</p>
         <table style="width:100%;color:#dfe5ee;font-size:.85rem;"><tr style="color:var(--text-muted);text-align:left;"><th>ID</th><th>Nome</th><th>Dificuldade</th><th>Veículo</th><th>Origem</th></tr>
-            <?php foreach ($cp['trainingBots'] as $b): ?><tr><td><?php echo $h($b['id']); ?></td><td><?php echo $h($b['name']); ?></td><td><?php echo $h($b['difficulty']); ?></td><td><?php echo $h($b['vehicle']); ?></td><td><?php echo $h($b['source'] ?? ''); ?></td></tr><?php endforeach; ?>
+            <?php foreach (($cp['trainingBots'] ?? []) as $b): ?><tr><td><?php echo $h($b['id']); ?></td><td><?php echo $h($b['name']); ?></td><td><?php echo $h($b['difficulty']); ?></td><td><?php echo $h($b['vehicle']); ?></td><td><?php echo $h($b['source'] ?? ''); ?></td></tr><?php endforeach; ?>
         </table>
         <form method="post"><input type="hidden" name="csrf" value="<?php echo $h($csrf); ?>"><input type="hidden" name="action" value="import_bots"><button style="margin-top:10px;background:#273142;color:#fff;border:0;border-radius:8px;padding:8px 14px;font-weight:700;">Importar bots activos da Arena como bots de treino</button></form>
     </div>

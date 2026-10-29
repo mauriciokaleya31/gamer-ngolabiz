@@ -180,10 +180,16 @@ export class City {
     t.repeat.set(1, 1);
     const ground = new THREE.Mesh(planeXZ(-700, 700, -700, 700, -0.25, 6), new THREE.MeshStandardMaterial({ map: dirtTexture(), roughness: 1 }));
     this.add(ground);
-    // blocos urbanos: pavimento de betão por baixo dos edifícios e logradouros
+    // blocos urbanos: pavimento de betão por baixo dos edifícios e logradouros (cobre toda a cidade expandida)
     const lotM = new THREE.MeshStandardMaterial({ map: sidewalkTexture(), color: 0xb9b2a4, roughness: 0.95 });
     const lots = [];
-    for (const b of [[-130, -63, -110, -15], [-130, -63, 15, 110], [63, 130, -110, -15], [63, 130, 15, 110], [-47, 47, -110, -98], [-47, 47, 98, 110], [-47, 47, -82, -15], [-47, 47, 15, 82]]) {
+    for (const b of [
+      [-160, -63, -150, -15], [-160, -63, 15, 150],
+      [63, 160, -150, -15], [63, 160, 15, 150],
+      [-47, 47, -150, -98], [-47, 47, 98, 150],
+      [-47, 47, -82, -15], [-47, 47, 15, 82],
+      [-230, -165, -150, 150], [165, 230, -150, 150],
+    ]) {
       lots.push(planeXZ(b[0], b[1], b[2], b[3], 0.0, 3));
     }
     this.add(new THREE.Mesh(mergeGeometries(lots), lotM));
@@ -478,6 +484,81 @@ export class City {
         scr.position.set(b.cx + k * 4.2, 1.35, b.cz + 0.36);
         this.group.add(scr);
       }
+    } else if (b.id === 'supermercado_kwanza') {
+      // Supermercado Kwanza: grandes corredores, caixas registadoras e vitrines de frescos
+      const checkouts = new THREE.Mesh(new THREE.BoxGeometry(10, 1.1, 1.2), new THREE.MeshStandardMaterial({ color: 0xe65100, roughness: 0.5 }));
+      checkouts.position.set(b.cx, 0.55, b.minZ + 3.2);
+      this.add(checkouts, { cast: true });
+      const shelfM = new THREE.MeshStandardMaterial({ color: 0x90a4ae, metalness: 0.3, roughness: 0.5 });
+      for (let s = -2; s <= 2; s++) {
+        const shelf = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.4, 12), shelfM);
+        shelf.position.set(b.cx + s * 4.5, 1.2, b.cz + 2);
+        this.add(shelf, { cast: true });
+      }
+      const drinkCooler = new THREE.Mesh(new THREE.BoxGeometry(8, 2.5, 1), new THREE.MeshStandardMaterial({ color: 0x0284c7, emissive: 0x38bdf8, emissiveIntensity: 0.5, roughness: 0.2 }));
+      drinkCooler.position.set(b.cx, 1.25, b.maxZ - 1.2);
+      this.group.add(drinkCooler);
+    } else if (b.id === 'concessionario_kalunga') {
+      // Concessionário Auto Kalunga: Showroom com pódio circular e expositor
+      const podium = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 4.8, 0.3, 32), new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.3, metalness: 0.7 }));
+      podium.position.set(b.cx, 0.15, b.cz);
+      this.add(podium, { cast: true });
+      const desk = new THREE.Mesh(new THREE.BoxGeometry(4.5, 1.1, 1.1), new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 }));
+      desk.position.set(b.cx, 0.55, b.minZ + 2.5);
+      this.add(desk, { cast: true });
+    } else if (b.id === 'aluguer_kianda') {
+      // Rent-a-Car Kianda: balcão moderno azul e painel informativo
+      const desk = new THREE.Mesh(new THREE.BoxGeometry(5, 1.1, 1.1), new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.4 }));
+      desk.position.set(b.cx, 0.55, b.minZ + 2.5);
+      this.add(desk, { cast: true });
+    } else if (b.id === 'imobiliaria_kianda') {
+      // Agência Imobiliária Kianda: mesa com maquete de condomínio e balcão
+      const desk = new THREE.Mesh(new THREE.BoxGeometry(6, 1.1, 1.1), new THREE.MeshStandardMaterial({ color: 0x0f766e, roughness: 0.4 }));
+      desk.position.set(b.cx, 0.55, b.minZ + 2.5);
+      this.add(desk, { cast: true });
+      const modelTable = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.8, 2.5), new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5 }));
+      modelTable.position.set(b.cx, 0.4, b.cz + 2);
+      this.add(modelTable, { cast: true });
+    } else if (b.id === 'centro_combate') {
+      // Ringue de Combate 1v1: estrado elevado, tapete de lona e 4 postes com cordas
+      const ringBase = new THREE.Mesh(new THREE.BoxGeometry(9, 0.6, 9), new THREE.MeshStandardMaterial({ color: 0x7f1d1d, roughness: 0.7 }));
+      ringBase.position.set(b.cx, 0.3, b.cz);
+      this.add(ringBase, { cast: true });
+      const mat = new THREE.Mesh(planeXZ(b.cx - 4.2, b.cx + 4.2, b.cz - 4.2, b.cz + 4.2, 0.61, 1), new THREE.MeshStandardMaterial({ color: 0xdcfce7, roughness: 0.8 }));
+      this.add(mat);
+      for (const [sx, sz, c] of [[-4.2, -4.2, 0xef4444], [4.2, -4.2, 0x3b82f6], [-4.2, 4.2, 0xffffff], [4.2, 4.2, 0xffffff]]) {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.2, 12), new THREE.MeshStandardMaterial({ color: c, roughness: 0.4 }));
+        post.position.set(b.cx + sx, 1.5, b.cz + sz);
+        this.add(post, { cast: true });
+      }
+      for (const y of [1.1, 1.5, 1.9]) {
+        for (const [px, pz, w, d, col] of [
+          [b.cx, b.cz - 4.2, 8.4, 0.05, 0xef4444],
+          [b.cx, b.cz + 4.2, 8.4, 0.05, 0x3b82f6],
+          [b.cx - 4.2, b.cz, 0.05, 8.4, 0xffffff],
+          [b.cx + 4.2, b.cz, 0.05, 8.4, 0xffffff],
+        ]) {
+          const rope = new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, d), new THREE.MeshStandardMaterial({ color: col, roughness: 0.5 }));
+          rope.position.set(px, y, pz);
+          this.group.add(rope);
+        }
+      }
+    } else if (b.id === 'arena_tiro') {
+      // Arena Táctica de Tiro: barricadas de treino, caixas tácticas e alvos
+      for (const [bx, bz, bw, bd] of [
+        [b.cx - 4, b.cz - 2, 2.5, 0.6],
+        [b.cx + 4, b.cz + 2, 2.5, 0.6],
+        [b.cx, b.cz, 1.8, 1.8],
+      ]) {
+        const barrier = new THREE.Mesh(new THREE.BoxGeometry(bw, 1.2, bd), new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9 }));
+        barrier.position.set(bx, 0.6, bz);
+        this.add(barrier, { cast: true });
+      }
+    } else if (b.id === 'centro_corridas') {
+      // Centro de Corridas & Autódromo: bancadas técnicas, pneus de proteção e pódio
+      const podium = new THREE.Mesh(new THREE.BoxGeometry(4, 0.6, 1.8), new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.5 }));
+      podium.position.set(b.cx, 0.3, b.minZ + 3);
+      this.add(podium, { cast: true });
     } else if (b.type === 'house') {
       // Interior de moradia: tapete, sofá e mesa de sala
       const rug = new THREE.Mesh(planeXZ(b.cx - 1.8, b.cx + 1.8, b.cz - 1.4, b.cz + 1.4, 0.135, 1), new THREE.MeshStandardMaterial({ color: 0x8d3b2f, roughness: 0.9 }));
@@ -832,11 +913,11 @@ export class City {
     const items = [];
     for (let i = 0; i < 140; i++) {
       const ang = rng.next() * Math.PI * 2;
-      const r = 190 + rng.next() * 260;
+      const r = 310 + rng.next() * 320;
       const x = Math.cos(ang) * r * 1.2;
       const z = Math.sin(ang) * r;
-      if (Math.abs(x) < 150 && Math.abs(z) < 130) continue;
-      items.push([x, z, 12 + rng.next() * 22, 12 + rng.next() * 22, 10 + rng.next() * (r < 300 ? 55 : 90)]);
+      if (Math.abs(x) < 255 && Math.abs(z) < 215) continue;
+      items.push([x, z, 12 + rng.next() * 22, 12 + rng.next() * 22, 10 + rng.next() * (r < 450 ? 55 : 90)]);
     }
     const tex = facadeTextures('office', '#8c99a6', 7);
     const m = windowMaterial(tex.map, tex.emissive, { warm: true });

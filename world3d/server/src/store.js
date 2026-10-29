@@ -44,6 +44,25 @@ CREATE TABLE IF NOT EXISTS escrows (
   id TEXT PRIMARY KEY, competition_id TEXT UNIQUE NOT NULL, stake INTEGER NOT NULL, participants TEXT NOT NULL,
   status TEXT NOT NULL, fee_pct REAL NOT NULL, created_at INTEGER NOT NULL, closed_at INTEGER
 );
+CREATE TABLE IF NOT EXISTS consumables_inventory (
+  player_id TEXT NOT NULL, item_id TEXT NOT NULL, qty INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL,
+  PRIMARY KEY (player_id, item_id)
+);
+CREATE TABLE IF NOT EXISTS vehicle_rentals (
+  id TEXT PRIMARY KEY, player_id TEXT NOT NULL, rental_id TEXT NOT NULL, vehicle_item_id TEXT NOT NULL,
+  vehicle_class TEXT NOT NULL, price_kz INTEGER NOT NULL, started_at INTEGER NOT NULL, expires_at INTEGER NOT NULL,
+  status TEXT NOT NULL, txn_id TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_rentals_player ON vehicle_rentals(player_id);
+CREATE TABLE IF NOT EXISTS properties_owned (
+  player_id TEXT NOT NULL, property_id TEXT NOT NULL, building_id TEXT NOT NULL, mode TEXT NOT NULL,
+  price_kz INTEGER NOT NULL, acquired_at INTEGER NOT NULL, expires_at INTEGER, status TEXT NOT NULL, txn_id TEXT,
+  PRIMARY KEY (player_id, property_id)
+);
+CREATE TABLE IF NOT EXISTS arena_matches (
+  id TEXT PRIMARY KEY, mode TEXT NOT NULL, center_id TEXT NOT NULL, stake_kz INTEGER NOT NULL,
+  winner_id TEXT, record TEXT NOT NULL, hash TEXT NOT NULL, created_at INTEGER NOT NULL
+);
 `;
 
 export class Store {
@@ -173,6 +192,67 @@ export class Store {
 
   grantItem(playerId, itemId, source, txnId = null) {
     this.db.prepare('INSERT OR IGNORE INTO inventory (player_id, item_id, acquired_at, source, txn_id) VALUES (?, ?, ?, ?, ?)').run(playerId, itemId, Date.now(), source, txnId);
+  }
+
+  addConsumable(playerId, itemId, delta = 1) {
+    const now = Date.now();
+    this.db.prepare(`INSERT INTO consumables_inventory (player_id, item_id, qty, updated_at) VALUES (?, ?, ?, ?)
+      ON CONFLICT(player_id, item_id) DO UPDATE SET qty = MAX(0, consumables_inventory.qty + excluded.qty), updated_at = excluded.updated_at`)
+      .run(playerId, itemId, delta, now);
+    return this.consumablesOf(playerId);
+  }
+
+  consumablesOf(playerId) {
+    return Object.fromEntries(
+      this.db.prepare('SELECT item_id, qty FROM consumables_inventory WHERE player_id = ? AND qty > 0').all(playerId).map((r) => [r.item_id, r.qty]),
+    );
+  }
+
+  createRental({ id, playerId, rentalId, vehicleItemId, vehicleClass, priceKz, startedAt, expiresAt, txnId }) {
+    this.db.prepare('INSERT INTO vehicle_rentals (id, player_id, rental_id, vehicle_item_id, vehicle_class, price_kz, started_at, expires_at, status, txn_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(id, playerId, rentalId, vehicleItemId, vehicleClass, priceKz, startedAt, expiresAt, 'active', txnId ?? null);
+    return this.activeRentalsOf(playerId, startedAt);
+  }
+
+  activeRentalsOf(playerId, now = Date.now()) {
+    this.db.prepare("UPDATE vehicle_rentals SET status = 'expired' WHERE player_id = ? AND status = 'active' AND expires_at <= ?").run(playerId, now);
+    return this.db.prepare("SELECT * FROM vehicle_rentals WHERE player_id = ? AND status = 'active' ORDER BY started_at DESC").all(playerId).map((r) => ({
+      id: r.id, playerId: r.player_id, rentalId: r.rental_id, vehicleItemId: r.vehicle_item_id, vehicleClass: r.vehicle_class,
+      priceKz: r.price_kz, startedAt: r.started_at, expiresAt: r.expires_at, status: r.status,
+    }));
+  }
+
+  returnRental(playerId, contractId) {
+    const c = this.db.prepare("UPDATE vehicle_rentals SET status = 'returned' WHERE id = ? AND player_id = ? AND status = 'active'").run(contractId, playerId);
+    return c.changes > 0;
+  }
+
+  upsertProperty({ playerId, propertyId, buildingId, mode, priceKz, acquiredAt, expiresAt = null, txnId = null }) {
+    this.db.prepare(`INSERT INTO properties_owned (player_id, property_id, building_id, mode, price_kz, acquired_at, expires_at, status, txn_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?)
+      ON CONFLICT(player_id, property_id) DO UPDATE SET mode = excluded.mode, price_kz = excluded.price_kz, acquired_at = excluded.acquired_at, expires_at = excluded.expires_at, status = 'active', txn_id = excluded.txn_id`)
+      .run(playerId, propertyId, buildingId, mode, priceKz, acquiredAt, expiresAt, txnId);
+    return this.propertiesOf(playerId, acquiredAt);
+  }
+
+  propertiesOf(playerId, now = Date.now()) {
+    this.db.prepare("UPDATE properties_owned SET status = 'expired' WHERE player_id = ? AND status = 'active' AND expires_at IS NOT NULL AND expires_at <= ?").run(playerId, now);
+    return this.db.prepare("SELECT * FROM properties_owned WHERE player_id = ? AND status = 'active' ORDER BY acquired_at DESC").all(playerId).map((r) => ({
+      playerId: r.player_id, propertyId: r.property_id, buildingId: r.building_id, mode: r.mode,
+      priceKz: r.price_kz, acquiredAt: r.acquired_at, expiresAt: r.expires_at, status: r.status,
+    }));
+  }
+
+  saveArenaMatch(record, hash) {
+    this.db.prepare('INSERT INTO arena_matches (id, mode, center_id, stake_kz, winner_id, record, hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(record.matchId, record.mode, record.centerId, record.stakeKz ?? 0, record.winnerId ?? null, JSON.stringify(record), hash, record.endedAt ?? Date.now());
+  }
+
+  recentArenaMatches(limit = 20, mode = null) {
+    const rows = mode
+      ? this.db.prepare('SELECT * FROM arena_matches WHERE mode = ? ORDER BY created_at DESC LIMIT ?').all(mode, limit)
+      : this.db.prepare('SELECT * FROM arena_matches ORDER BY created_at DESC LIMIT ?').all(limit);
+    return rows.map((r) => ({ matchId: r.id, mode: r.mode, centerId: r.center_id, stakeKz: r.stake_kz, winnerId: r.winner_id, record: JSON.parse(r.record), hash: r.hash, createdAt: r.created_at }));
   }
 
   getPrefs(playerId) {

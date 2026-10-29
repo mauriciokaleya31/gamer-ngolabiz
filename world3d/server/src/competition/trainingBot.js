@@ -16,16 +16,16 @@ export const DEFAULT_TRAINING_BOTS = [
 ];
 
 export class TrainingBotDriver {
-  constructor(def, grid) {
+  constructor(def, grid, track = null) {
     this.def = def;
     this.id = def.id;
     this.vmax = BOT_SPEEDS[def.difficulty] ?? BOT_SPEEDS.medio;
-    this.line = [[grid[0], grid[1]], ...RACE_TRACK.racingLine.slice(1)];
+    this.line = [[grid[0], grid[1]], ...(track ?? RACE_TRACK).racingLine.slice(1)];
     this.seg = 0;
     this.t = 0;
     this.x = grid[0];
     this.z = grid[1];
-    this.heading = RACE_TRACK.start.heading;
+    this.heading = (track ?? RACE_TRACK).start.heading;
     this.speed = 0;
     this.done = false;
   }

@@ -74,9 +74,41 @@ export const VEHICLES = [
 
 export const PAINT_PALETTE = ['#b71c1c', '#0d47a1', '#f5f5f5', '#212121', '#9e9e9e', '#1b5e20', '#f9a825', '#e65100', '#6a1b9a', '#00838f', '#c2185b', '#4e342e'];
 
+const S = (id, category, name, price, extra = {}) => ({
+  id, kind: 'consumable', slot: 'consumable', category, name, price,
+  status: 'pronto', active: true, published: true, thumbnail: null, ...extra,
+});
+
+export const SUPERMARKET_ITEMS = [
+  S('agua_kianda', 'Bebidas', 'Água Mineral da Kianda 1,5L', 150, { icon: '💧', desc: 'Hidratação rápida para caminhadas na cidade (+10 Energia).' }),
+  S('sumo_muka', 'Bebidas', 'Sumo Natural de Múcua', 350, { icon: '🧃', desc: 'Bebida tradicional angolana rica em energia (+25 Energia).' }),
+  S('energetico_turbo', 'Energia', 'Energético Ngola Turbo', 600, { icon: '⚡', desc: 'Aumenta o fôlego e preparação antes de competições (+50 Energia).' }),
+  S('refeicao_funge', 'Alimentação', 'Prato de Funge & Calulu', 1200, { icon: '🍲', desc: 'Refeição completa do Mercado Kianda (Recuperação Total).' }),
+  S('mufete_ilha', 'Alimentação', 'Mufete Tradicional da Ilha', 1800, { icon: '🐟', desc: 'Especialidade grelhada com feijão de óleo de palma e banana.' }),
+  S('kit_primeiros_socorros', 'Utilitários', 'Kit Médico de Arena', 900, { icon: '🧰', desc: 'Kit de apoio táctico para recuperações entre rondas.' }),
+  S('kit_reparacao', 'Automóvel', 'Kit de Manutenção Kalunga', 1500, { icon: '🔧', desc: 'Ferramentas e aditivo para manutenção rápida de carro ou mota.' }),
+  S('passe_vip_arena', 'Eventos', 'Passe VIP Camarote Arena', 2500, { icon: '🎟️', desc: 'Acesso distinto às galerias de espectador nos Centros de Competição.' }),
+];
+
+export const RENTAL_CATALOG = [
+  { id: 'rent_sedan_kianda', vehicleItemId: 'sedan_kianda', name: 'Aluguer · Kianda Sedan Conforto', vehicleClass: 'car', priceKz: 400, durationMinutes: 30, depositKz: 0, specs: { maxSpeed: 38 }, status: 'pronto', active: true },
+  { id: 'rent_hatch_muxima', vehicleItemId: 'hatch_muxima', name: 'Aluguer · Muxima Hatch Urbano', vehicleClass: 'car', priceKz: 550, durationMinutes: 30, depositKz: 0, specs: { maxSpeed: 40 }, status: 'pronto', active: true },
+  { id: 'rent_suv_namibe', vehicleItemId: 'suv_namibe', name: 'Aluguer · Namibe SUV 4×4', vehicleClass: 'car', priceKz: 800, durationMinutes: 30, depositKz: 0, specs: { maxSpeed: 39 }, status: 'pronto', active: true },
+  { id: 'rent_desportivo_gt', vehicleItemId: 'desportivo_gt', name: 'Aluguer · Kianda GT Desportivo', vehicleClass: 'car', priceKz: 1500, durationMinutes: 30, depositKz: 0, specs: { maxSpeed: 52 }, status: 'pronto', active: true },
+  { id: 'rent_moto_ngola', vehicleItemId: 'moto_ngola', name: 'Aluguer · Mota Ngola 125', vehicleClass: 'moto', priceKz: 250, durationMinutes: 30, depositKz: 0, specs: { maxSpeed: 40 }, status: 'pronto', active: true },
+  { id: 'rent_moto_kupapata', vehicleItemId: 'moto_kupapata', name: 'Aluguer · Mota Kupapata Rápida', vehicleClass: 'moto', priceKz: 350, durationMinutes: 30, depositKz: 0, specs: { maxSpeed: 38 }, status: 'pronto', active: true },
+];
+
+export const PROPERTIES_CATALOG = [
+  { id: 'prop_apartamento_largo', buildingId: 'edificio_largo', name: 'Apartamento T2 Vista Largo', district: 'Largo da Kianda', type: 'apartment', buyPriceKz: 4500, rentPriceKz: 600, rentDays: 7, rooms: 'Sala ampla, 2 quartos, varanda sobre o Largo', spawn: [-31, -50], status: 'pronto', active: true },
+  { id: 'prop_moradia_mangueiras', buildingId: 'moradia_maianga_1', name: 'Moradia Familiar das Mangueiras', district: 'Bairro das Mangueiras & Maianga', type: 'house', buyPriceKz: 6500, rentPriceKz: 850, rentDays: 7, rooms: 'Sala mobilada, quintal privado, 3 quartos', spawn: [-156, -79], status: 'pronto', active: true },
+  { id: 'prop_vivenda_miramar', buildingId: 'vivenda_miramar', name: 'Vivenda Modelo Miramar', district: 'Maianga / Miramar', type: 'house', buyPriceKz: 9000, rentPriceKz: 1200, rentDays: 7, rooms: 'Vivenda de 2 pisos, salão nobre, garagem e jardim', spawn: [-156, -46], status: 'pronto', active: true },
+  { id: 'prop_condominio_talatona', buildingId: 'apartamento_talatona', name: 'Penthouse Condomínio Talatona', district: 'Talatona Sul', type: 'apartment', buyPriceKz: 7800, rentPriceKz: 1000, rentDays: 7, rooms: 'Apartamento moderno com acabamentos premium e segurança', spawn: [-100, 145], status: 'pronto', active: true },
+];
+
 export const STARTER_ITEMS = [...CLOTHING.filter((i) => i.price === 0), ...VEHICLES.filter((v) => v.price === 0 && v.status !== 'indisponivel')].map((i) => i.id);
 
-export const CATALOG = [...CLOTHING, ...VEHICLES];
+export const CATALOG = [...CLOTHING, ...VEHICLES, ...SUPERMARKET_ITEMS];
 export const CATALOG_BY_ID = new Map(CATALOG.map((i) => [i.id, i]));
 
 /** Aplica sobreposições do administrador. */

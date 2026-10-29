@@ -7,6 +7,7 @@ import { RACE_TRACK, POIS } from '../../shared/zone.js';
 import { EMOTE_BY_ID } from '../../shared/emotes.js';
 import { ExpressionsUI } from './ui/expressions.js';
 import { ShopsUI } from './ui/shops.js';
+import { WorldMapUI } from './ui/worldMap.js';
 import { TouchControls, isTouchDevice } from './ui/touch.js';
 import { City } from './city.js';
 import { Environment } from './environment.js';
@@ -82,6 +83,15 @@ const shops = new ShopsUI({
   onAppearanceSaved: (a) => { player.setAppearance(a); try { localStorage.setItem('w3d_appearance', JSON.stringify(a)); } catch { /* ignorar */ } },
 });
 
+const worldMap = new WorldMapUI({
+  net,
+  onTravel: (target) => {
+    net.send({ t: 'travel', to: target.id ?? target.name });
+    hud.toast(`⚡ A viajar para ${target.name}…`);
+  },
+  onSetWaypoint: (wp) => hud.setWaypoint(wp),
+});
+
 function requestEmote(id) {
   if (!player || player.mode !== 'foot' || race) { hud.toast('Emotes disponíveis a pé, fora das corridas.', 'bad'); return; }
   const def = EMOTE_BY_ID.get(id);
@@ -98,6 +108,7 @@ const hud = new Hud({
   onAction: (a, v) => {
     if (a === 'volume') audio.setVolume(v);
     if (a === 'edit_appearance') openAppearanceEditor();
+    if (a === 'open_map') worldMap.toggle();
   },
 });
 
@@ -172,8 +183,16 @@ function startGame(welcome) {
   player.onEmoteCancelled = () => net.send({ t: 'emote_stop' });
   expressions.setup(welcome.emotes, welcome.prefs);
   shops.setup({ catalog: welcome.catalog, owned: welcome.owned, prefs: welcome.prefs });
-  for (const [mode, sh] of Object.entries(welcome.shops)) { const poi = POIS.find((p) => p.id === sh.poi); if (poi) shopPositions[mode] = { x: poi.x, z: poi.z, name: sh.name }; }
+  for (const [mode, sh] of Object.entries(welcome.shops ?? {})) { const poi = POIS.find((p) => p.id === sh.poi); if (poi) shopPositions[mode] = { x: poi.x, z: poi.z, name: sh.name }; }
+  shopPositions.supermarket = { x: -85, z: -130, name: 'Supermercado Kwanza' };
+  shopPositions.dealership = { x: -160, z: 5, name: 'Concessionário Auto Kalunga' };
+  shopPositions.rental = { x: 145, z: 20, name: 'Rent-a-Car Kianda' };
+  shopPositions.realestate = { x: 95, z: -80, name: 'Agência Imobiliária Kianda' };
   shopPositions.betting = { x: 18, z: 22, name: 'Casa de Apostas & Desafios Kianda' };
+  shopPositions.combat = { x: 45, z: 145, name: 'Centro de Combate 1v1 Talatona' };
+  shopPositions.shooting = { x: 160, z: 140, name: 'Arena de Tiro Táctico Talatona' };
+  shopPositions.race_center = { x: -150, z: 135, name: 'Centro de Corridas Kianda' };
+
   document.querySelectorAll('#quick-actions button[data-qa]').forEach((b) => {
     b.onclick = () => {
       const qa = b.dataset.qa;
@@ -183,9 +202,17 @@ function startGame(welcome) {
         b.textContent = audio.voiceEnabled ? '🔊 Voz: ON' : '🔇 Voz: OFF';
         return;
       }
+      if (qa === 'map') {
+        worldMap.toggle();
+        return;
+      }
       if (qa === 'home') {
         net.send({ t: 'travel', to: 'home' });
         hud.toast('🏠 A entrar no Bairro Residencial das Mangueiras…');
+        return;
+      }
+      if (['wardrobe', 'supermarket', 'dealership', 'rental', 'garage', 'realestate', 'betting'].includes(qa)) {
+        shops.open(qa);
         return;
       }
       shops.open(qa);
@@ -339,6 +366,38 @@ net.on('race_result', (m) => {
   race && (race.finished = true);
 });
 
+// --------------------------------------------------------------- duelos e arenas 1v1
+let activeDuel = null;
+net.on('arena_setup', (m) => {
+  if (talkingTo) closeDialogue();
+  activeDuel = m;
+  player.frozen = true;
+  hud.arenaSetup(m, m.spectator);
+  hud.toast(`🥊 Duelo em ${m.centerName}: ${m.mode}`);
+});
+net.on('arena_go', (m) => {
+  if (player && !m.spectator) player.frozen = false;
+  hud.arenaState(m, 'Combate iniciado! Dá o teu melhor golpe!');
+});
+net.on('arena_state', (m) => {
+  if (activeDuel && activeDuel.matchId === m.matchId) {
+    activeDuel = m;
+    hud.arenaState(m, m.lastEvent);
+  }
+});
+net.on('arena_result', (m) => {
+  hud.arenaResult(m.record, m.hash, () => {
+    activeDuel = null;
+    if (player) player.frozen = false;
+    net.send({ t: 'wallet' });
+  });
+  player.frozen = true;
+});
+net.on('arena_overview', (m) => {
+  shops.arenaOverview = m.state;
+  if (shops.isOpen() && shops.mode === 'betting') shops.render();
+});
+
 const headlights = [new THREE.SpotLight(0xfff2d6, 0, 45, 0.45, 0.5, 1.4), new THREE.SpotLight(0xfff2d6, 0, 45, 0.45, 0.5, 1.4)];
 function attachHeadlights() {
   const v = player.vehicle;
@@ -379,7 +438,27 @@ function bindGameKeys() {
       }
       case 'KeyG': e.preventDefault(); document.exitPointerLock?.(); expressions.toggle('emotes'); break;
       case 'KeyJ': e.preventDefault(); document.exitPointerLock?.(); expressions.toggle('emojis'); break;
-      case 'Digit1': case 'Digit2': case 'Digit3': case 'Digit4': expressions.quick(Number(e.code.slice(-1)) - 1); break;
+      case 'KeyM': e.preventDefault(); document.exitPointerLock?.(); worldMap.toggle(); break;
+      case 'Digit1':
+      case 'Digit2':
+      case 'Digit3':
+      case 'Digit4': {
+        if (activeDuel && !activeDuel.spectator && activeDuel.status === 'active') {
+          e.preventDefault();
+          const act = e.code === 'Digit1' ? 'strike' : e.code === 'Digit2' ? (activeDuel.mode === 'combate_1v1' ? 'heavy' : 'aimed_shot') : e.code === 'Digit3' ? 'guard' : 'strike';
+          net.send({ t: 'arena_action', action: act });
+          break;
+        }
+        expressions.quick(Number(e.code.slice(-1)) - 1);
+        break;
+      }
+      case 'KeyR': {
+        if (activeDuel && !activeDuel.spectator && activeDuel.status === 'active' && activeDuel.mode !== 'combate_1v1') {
+          e.preventDefault();
+          net.send({ t: 'arena_action', action: 'reload' });
+        }
+        break;
+      }
       case 'KeyF': {
         if (race) break;
         if (player.vehicle) { player.exitVehicle({ keepModel: true }); net.send({ t: 'vehicle_exit' }); break; }
@@ -399,7 +478,16 @@ function bindGameKeys() {
       case 'KeyH': if (player.vehicle) audio.horn(); break;
       case 'Tab': e.preventDefault(); document.exitPointerLock?.(); player.inputEnabled = !hud.toggleMenu(); break;
       case 'Enter': e.preventDefault(); document.exitPointerLock?.(); $('chat-input').focus(); break;
-      case 'Escape': closeDialogue(); hud.toggleMenu(false); shops.close(); expressions.toggle(expressions.tab, false); $('profile').classList.add('hidden'); player.inputEnabled = true; break;
+      case 'Escape': {
+        if (worldMap.isOpen()) { worldMap.close(); break; }
+        closeDialogue();
+        hud.toggleMenu(false);
+        shops.close();
+        expressions.toggle(expressions.tab, false);
+        $('profile').classList.add('hidden');
+        player.inputEnabled = true;
+        break;
+      }
       case 'F6': case 'F7': case 'F8': case 'F9': {
         if (!hud.features.diagnostics) break;
         e.preventDefault();
@@ -465,7 +553,14 @@ function loop(now) {
   hud.updateClock(vNow, net.time, net.weather);
   if (race) hud.raceTick(race, net.serverNow());
   mmAcc += dt;
-  if (mmAcc > 0.08) { mmAcc = 0; hud.drawMinimap({ x: player.pos.x, z: player.pos.z, heading: player.heading }, player.yaw, actors, race); }
+  if (mmAcc > 0.08) {
+    mmAcc = 0;
+    hud.drawMinimap({ x: player.pos.x, z: player.pos.z, heading: player.heading }, player.yaw, actors, race);
+    if (worldMap.isOpen()) {
+      worldMap.updatePlayer(player.pos.x, player.pos.z, player.heading);
+      worldMap.updateActors(actors);
+    }
+  }
 
   let carsNear = 0;
   for (const a of actors.cars.values()) if (a.root.position.distanceTo(player.pos) < 60) carsNear++;

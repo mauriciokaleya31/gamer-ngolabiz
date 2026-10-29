@@ -12,21 +12,27 @@
 import { makeRng } from './rng.js';
 
 export const ZONE_ID = 'kianda_centro';
-export const ZONE_BOUNDS = Object.freeze({ minX: -130, maxX: 130, minZ: -110, maxZ: 110 });
+export const ZONE_BOUNDS = Object.freeze({ minX: -240, maxX: 240, minZ: -200, maxZ: 200 });
 
 export const ROADS = Object.freeze([
-  { id: 'av_kianda', name: 'Avenida da Kianda', axis: 'x', at: 0, from: -130, to: 130, width: 20, sidewalk: 5, lanes: 4, parking: true },
-  { id: 'rua_mercado', name: 'Rua do Mercado', axis: 'z', at: -55, from: -110, to: 110, width: 8, sidewalk: 4, lanes: 2 },
-  { id: 'rua_oficina', name: 'Rua da Oficina', axis: 'z', at: 55, from: -110, to: 110, width: 8, sidewalk: 4, lanes: 2 },
+  { id: 'av_kianda', name: 'Avenida da Kianda', axis: 'x', at: 0, from: -230, to: 230, width: 20, sidewalk: 5, lanes: 4, parking: true },
+  { id: 'rua_mercado', name: 'Rua do Mercado', axis: 'z', at: -55, from: -190, to: 190, width: 8, sidewalk: 4, lanes: 2 },
+  { id: 'rua_oficina', name: 'Rua da Oficina', axis: 'z', at: 55, from: -190, to: 190, width: 8, sidewalk: 4, lanes: 2 },
   { id: 'rua_acacias', name: 'Rua das Acácias', axis: 'x', at: -90, from: -55, to: 55, width: 8, sidewalk: 4, lanes: 2 },
   { id: 'rua_parque', name: 'Rua do Parque', axis: 'x', at: 90, from: -55, to: 55, width: 8, sidewalk: 4, lanes: 2 },
+  { id: 'av_marginal_norte', name: 'Avenida Marginal Norte', axis: 'x', at: -155, from: -165, to: 165, width: 8, sidewalk: 4, lanes: 2 },
+  { id: 'av_talatona_sul', name: 'Avenida Talatona Sul', axis: 'x', at: 155, from: -165, to: 165, width: 8, sidewalk: 4, lanes: 2 },
+  { id: 'rua_maianga_oeste', name: 'Rua da Maianga', axis: 'z', at: -165, from: -155, to: 155, width: 8, sidewalk: 4, lanes: 2 },
+  { id: 'rua_zona_industrial', name: 'Rua do Polo Industrial', axis: 'z', at: 165, from: -155, to: 155, width: 8, sidewalk: 4, lanes: 2 },
 ]);
 
 export const DISTRICTS = Object.freeze({
   centro: { name: 'Largo da Kianda', style: 'comercial', palette: ['#e8dcc4', '#d9c7a3', '#f1e6d0', '#c9b79a'] },
   parque: { name: 'Jardim do Parque', style: 'lazer', palette: ['#dfe7d4', '#cfd9c0'] },
-  residencial: { name: 'Bairro das Mangueiras', style: 'residencial', palette: ['#f2b5a7', '#f4d58d', '#a8d5ba', '#9fc5e8', '#e6b8d0', '#f7c873'] },
-  oficinas: { name: 'Zona Kalunga', style: 'industrial', palette: ['#b8bcc2', '#9aa3ad', '#c7c2b8', '#8f9aa6'] },
+  residencial: { name: 'Bairro das Mangueiras & Maianga', style: 'residencial', palette: ['#f2b5a7', '#f4d58d', '#a8d5ba', '#9fc5e8', '#e6b8d0', '#f7c873'] },
+  oficinas: { name: 'Zona Kalunga & Polo Industrial', style: 'industrial', palette: ['#b8bcc2', '#9aa3ad', '#c7c2b8', '#8f9aa6'] },
+  comercial: { name: 'Zona Comercial & Hipermercados', style: 'comercial', palette: ['#f5ebe0', '#e3d5ca', '#d5bdaf'] },
+  competicoes: { name: 'Complexo Desportivo & Arenas Talatona', style: 'competicoes', palette: ['#1e293b', '#334155', '#475569'] },
 });
 
 // ---------------------------------------------------------------------------
@@ -239,6 +245,27 @@ function generateBuildings() {
     add(building(`fecho_s_${B.length}`, x, x + rng.range(13, 16), 98.5, 109, { name: 'Edifício', type: 'apartment', district: 'parque', floors: rng.int(5, 10), height: 0, face: 'N', color: rng.pick(DISTRICTS.residencial.palette) }));
   }
 
+  // --- EXPANSÃO DO MUNDO: Novos Bairros, Supermercado, Concessionários, Imóveis e Centros de Competição ---
+  // 1. Zona Comercial Norte & Avenida Marginal Norte
+  add(building('supermercado_kwanza', -116, -84, -142, -118, { name: 'Supermercado Kwanza', type: 'shop', district: 'comercial', floors: 2, height: 8.4, face: 'N', interior: true, color: '#e65100', openHours: [6, 23], sign: 'SUPERMERCADO KWANZA' }));
+  add(building('imobiliaria_kianda', -20, 12, -142, -120, { name: 'Agência Imobiliária Kianda', type: 'shop', district: 'centro', floors: 3, height: 10.8, face: 'N', interior: true, color: '#0f766e', openHours: [8, 20], sign: 'IMOBILIÁRIA KIANDA' }));
+  add(building('galeria_marginal', 18, 44, -142, -120, { name: 'Galeria Comercial Marginal', type: 'office', district: 'comercial', floors: 6, height: 21, face: 'N', color: '#94a3b8', glass: true }));
+
+  // 2. Polo Automóvel & Industrial Kalunga (Este)
+  add(building('concessionario_kalunga', 128, 153, -96, -70, { name: 'Concessionário Auto Kalunga', type: 'shop', district: 'oficinas', floors: 2, height: 8.0, face: 'E', interior: true, garageDoor: true, color: '#1e293b', openHours: [7, 21], sign: 'STAND AUTO KALUNGA' }));
+  add(building('aluguer_kianda', 130, 153, -42, -18, { name: 'Rent-a-Car & Aluguer Kianda', type: 'shop', district: 'oficinas', floors: 1, height: 5.5, face: 'E', interior: true, color: '#0284c7', openHours: [0, 24], sign: 'RENT-A-CAR KIANDA' }));
+
+  // 3. Expansão Residencial Maianga & Talatona (Casas e Apartamentos com Interiores)
+  add(building('vivenda_miramar', -153, -133, -56, -36, { name: 'Vivenda Modelo Miramar', type: 'house', district: 'residencial', floors: 2, height: 7.2, face: 'W', interior: true, color: '#f4d58d', roof: 'gable', sign: 'VIVENDA MIRAMAR' }));
+  add(building('moradia_maianga_1', -153, -135, -88, -70, { name: 'Moradia Maianga Norte', type: 'house', district: 'residencial', floors: 2, height: 7.0, face: 'W', interior: true, color: '#a8d5ba', roof: 'gable' }));
+  add(building('moradia_maianga_2', -153, -135, 36, 54, { name: 'Moradia Maianga Sul', type: 'house', district: 'residencial', floors: 1, height: 4.2, face: 'W', interior: true, color: '#f2b5a7', roof: 'flat' }));
+  add(building('apartamento_talatona', -116, -84, 120, 142, { name: 'Condomínio Residencial Talatona', type: 'apartment', district: 'residencial', floors: 5, height: 17.5, face: 'S', interior: true, color: '#9fc5e8', openHours: [0, 24], sign: 'RESIDENCIAL TALATONA' }));
+
+  // 4. Complexo Desportivo, Arenas de Combate 1v1, Tiro/Sobrevivência e Corridas (Sul)
+  add(building('centro_combate', -38, -8, 118, 142, { name: 'Centro de Combate & Ringue 1v1', type: 'gym', district: 'competicoes', floors: 2, height: 8.6, face: 'S', interior: true, color: '#991b1b', openHours: [0, 24], sign: 'ARENA DE COMBATE 1V1' }));
+  add(building('arena_tiro', 10, 42, 118, 142, { name: 'Arena Táctica de Tiro & Sobrevivência', type: 'gym', district: 'competicoes', floors: 2, height: 8.8, face: 'S', interior: true, color: '#1e3a8a', openHours: [0, 24], sign: 'ARENA TÁCTICA & TIRO' }));
+  add(building('centro_corridas', 118, 152, 118, 142, { name: 'Autódromo & Centro de Corridas Kalunga', type: 'gym', district: 'competicoes', floors: 2, height: 8.2, face: 'S', interior: true, garageDoor: true, color: '#b45309', openHours: [0, 24], sign: 'CENTRO DE CORRIDAS' }));
+
   for (const b of B) {
     if (!b.height) b.height = b.floors * 3.2 + (b.roof === 'gable' ? 0.4 : 0.6);
     b.homeSlots = b.type === 'house' ? 3 : b.type === 'apartment' ? Math.min(12, b.floors * 2) : 0;
@@ -307,6 +334,7 @@ function generateProps() {
       const a = (horizontal ? s.minX : s.minZ) + 3 + t * (len - 6);
       const x = horizontal ? a : nearRoad;
       const z = horizontal ? nearRoad : a;
+      if (BUILDINGS.some((b) => { const d = doorPoint(b); return Math.hypot(d.x - x, d.z - z) < 4.5; })) continue;
       const facing = horizontal ? (s.minZ >= road.at ? 'N' : 'S') : (s.minX >= road.at ? 'W' : 'E');
       P.push({ id: `lamp_${P.length}`, kind: 'streetlight', x, z, facing, h: 7.5, r: 0.2, solid: true });
     }
@@ -395,6 +423,14 @@ function generatePois() {
   poi('paragem_av', 'bus_stop', 'Paragem da Avenida', -30, 14.6, { capacity: 6 });
   poi('posto_seguranca_largo', 'guard_post', 'Posto de Segurança do Largo', 18, -36, { capacity: 1 });
   poi('posto_seguranca_arena', 'guard_post', 'Posto de Segurança da Arena', 46, 18, { capacity: 1 });
+  // Novos POIs da expansão urbana (Supermercado, Stand, Rent-a-Car, Imobiliária, Arenas 1v1)
+  poi('supermercado_kwanza_porta_poi', 'supermarket', 'Supermercado Kwanza', -100, -143.6, { buildingId: 'supermercado_kwanza', capacity: 8, openHours: [6, 23] });
+  poi('concessionario_kalunga_poi', 'dealership', 'Concessionário Auto Kalunga', 154.6, -83, { buildingId: 'concessionario_kalunga', capacity: 6, openHours: [7, 21] });
+  poi('aluguer_kianda_poi', 'car_rental', 'Rent-a-Car & Aluguer Kianda', 154.6, -30, { buildingId: 'aluguer_kianda', capacity: 4, openHours: [0, 24] });
+  poi('imobiliaria_kianda_poi', 'real_estate', 'Agência Imobiliária Kianda', -4, -143.6, { buildingId: 'imobiliaria_kianda', capacity: 4, openHours: [8, 20] });
+  poi('centro_combate_poi', 'combat_center', 'Centro de Combate & Ringue 1v1', -23, 143.6, { buildingId: 'centro_combate', capacity: 12, openHours: [0, 24] });
+  poi('arena_tiro_poi', 'shooting_center', 'Arena Táctica de Tiro & Sobrevivência', 26, 143.6, { buildingId: 'arena_tiro', capacity: 12, openHours: [0, 24] });
+  poi('centro_corridas_poi', 'race_center', 'Autódromo & Centro de Corridas Kalunga', 135, 143.6, { buildingId: 'centro_corridas', capacity: 10, openHours: [0, 24] });
   for (const s of BENCHES) poi(s.id, 'bench', 'Banco', s.x, s.z, { capacity: s.seats, angle: s.angle });
   return pois;
 }
@@ -445,7 +481,46 @@ export const PARKED_VEHICLES = Object.freeze([
   ...[-118, -100, -20, 26, 40, 78, 108].map((x, i) => ({ id: `park_av_s_${i}`, kind: i % 3 === 2 ? 'moto' : 'car', x, z: 8.5, heading: Math.PI / 2, usable: true })),
   ...[0, 1, 2, 3, 4, 5].map((i) => ({ id: `park_lot_${i}`, kind: i >= 4 ? 'moto' : 'car', x: 100 + (i % 3) * 9, z: i < 3 ? -46 : -24, heading: i < 3 ? 0 : Math.PI, usable: true })),
   { id: 'oficina_moto', kind: 'moto', x: 78, z: -15, heading: Math.PI / 2, usable: true },
+  // Veículos nos novos bairros (Supermercado, Stand Auto, Rent-a-Car, Arenas Sul)
+  { id: 'super_car_1', kind: 'car', x: -106, z: -148, heading: Math.PI / 2, usable: true },
+  { id: 'super_moto_1', kind: 'moto', x: -94, z: -148, heading: Math.PI / 2, usable: true },
+  { id: 'stand_car_1', kind: 'car', x: 158, z: -88, heading: 0, usable: true },
+  { id: 'stand_moto_1', kind: 'moto', x: 158, z: -78, heading: 0, usable: true },
+  { id: 'rent_car_1', kind: 'car', x: 158, z: -34, heading: 0, usable: true },
+  { id: 'rent_moto_1', kind: 'moto', x: 158, z: -26, heading: 0, usable: true },
+  { id: 'combate_car_1', kind: 'car', x: -26, z: 148, heading: -Math.PI / 2, usable: true },
+  { id: 'tiro_moto_1', kind: 'moto', x: 24, z: 148, heading: -Math.PI / 2, usable: true },
+  { id: 'corridas_car_1', kind: 'car', x: 132, z: 148, heading: -Math.PI / 2, usable: true },
 ]);
+
+export const RACE_TRACKS = Object.freeze({
+  circuito_anel_kianda: {
+    id: 'circuito_anel_kianda',
+    name: 'Circuito do Anel da Kianda',
+    laps: 1,
+    checkpointRadius: 11,
+    checkpoints: [
+      [30, -90], [55, -62], [55, -20], [55, 30], [55, 72], [25, 90], [-25, 90], [-55, 62], [-55, 20], [-55, -30], [-55, -72], [-5, -90],
+    ],
+    start: { heading: Math.PI / 2 },
+    grid: [[-22, -88.2], [-22, -91.8], [-30, -88.2], [-30, -91.8]],
+    racingLine: [[-22, -90], [49, -90], [55, -84], [55, 84], [49, 90], [-49, 90], [-55, 84], [-55, -84], [-49, -90], [-5, -90]],
+    closedRoads: ['rua_mercado', 'rua_oficina', 'rua_acacias', 'rua_parque'],
+  },
+  circuito_grande_luanda: {
+    id: 'circuito_grande_luanda',
+    name: 'Grande Circuito Urbano da Marginal & Talatona',
+    laps: 1,
+    checkpointRadius: 13,
+    checkpoints: [
+      [40, -155], [140, -155], [165, -90], [165, 0], [165, 90], [120, 155], [0, 155], [-120, 155], [-165, 90], [-165, 0], [-165, -90], [-40, -155],
+    ],
+    start: { heading: Math.PI / 2 },
+    grid: [[-10, -153.2], [-10, -156.8], [-18, -153.2], [-18, -156.8]],
+    racingLine: [[-10, -155], [159, -155], [165, -149], [165, 149], [159, 155], [-159, 155], [-165, 149], [-165, -149], [-159, -155], [-40, -155]],
+    closedRoads: ['av_marginal_norte', 'rua_zona_industrial', 'av_talatona_sul', 'rua_maianga_oeste'],
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Circuito de corrida (anel), pontos de controlo e grelha de partida

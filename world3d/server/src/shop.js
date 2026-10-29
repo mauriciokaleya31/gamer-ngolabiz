@@ -5,16 +5,25 @@
  * - A aparência pedida pelo cliente é validada: itens não possuídos, inactivos,
  *   indisponíveis ou incompatíveis são substituídos pelo item base.
  */
-import { effectiveCatalog, isSelectable, OPTIONAL_SLOTS, PAINT_PALETTE } from '../../shared/catalog.js';
+import { effectiveCatalog, isSelectable, OPTIONAL_SLOTS, PAINT_PALETTE, RENTAL_CATALOG, PROPERTIES_CATALOG } from '../../shared/catalog.js';
 import { POIS } from '../../shared/zone.js';
 
 export const SHOP_LOCATIONS = {
   wardrobe: { poi: 'loja_muxima_porta', name: 'Moda Muxima', kinds: ['clothing'] },
-  dealership: { poi: 'estacionamento', name: 'Concessionário Kalunga', kinds: ['vehicle'] },
+  dealership: { poi: 'estacionamento', altPoi: 'concessionario_kalunga_poi', name: 'Concessionário Auto Kalunga', kinds: ['vehicle'] },
   garage: { poi: 'oficina_kalunga_porta', name: 'Garagem Kalunga Motors', kinds: [] },
+  supermarket: { poi: 'supermercado_kwanza_porta_poi', altPoi: 'mercado_balcao', name: 'Supermercado Kwanza & Mercado Kianda', kinds: ['consumable'] },
+  rental: { poi: 'aluguer_kianda_poi', name: 'Rent-a-Car & Aluguer Kianda', kinds: ['rental'] },
+  realestate: { poi: 'imobiliaria_kianda_poi', name: 'Agência Imobiliária Kianda', kinds: ['property'] },
+  combat: { poi: 'centro_combate_poi', name: 'Centro de Combate & Ringue 1v1', kinds: [] },
+  shooting: { poi: 'arena_tiro_poi', name: 'Arena Táctica de Tiro & Sobrevivência', kinds: [] },
+  race_center: { poi: 'centro_corridas_poi', name: 'Autódromo & Centro de Corridas Kalunga', kinds: [] },
 };
 export const GARAGE_SPAWN = { x: 89, z: -12, heading: Math.PI / 2 };
+export const RENTAL_SPAWN = { x: 158, z: -30, heading: 0 };
 const POI_BY_ID = new Map(POIS.map((p) => [p.id, p]));
+const RENTAL_BY_ID = new Map(RENTAL_CATALOG.map((r) => [r.id, r]));
+const PROPERTY_BY_ID = new Map(PROPERTIES_CATALOG.map((pr) => [pr.id, pr]));
 
 export class ShopError extends Error {
   constructor(message, code) { super(message); this.code = code; }
@@ -37,7 +46,15 @@ export class ShopService {
   }
 
   publicCatalog() {
-    return this.catalog.filter((i) => i.published).map(({ id, kind, slot, name, price, status, active, thumbnail, gender, vehicleClass, body, paints, rims, model, asset, specs, license, livery }) => ({ id, kind, slot, name, price, status, active, thumbnail, gender, vehicleClass, body, paints, rims, model, asset, specs, license, livery }));
+    return this.catalog.filter((i) => i.published).map(({ id, kind, slot, category, name, price, status, active, thumbnail, gender, vehicleClass, body, paints, rims, model, asset, specs, license, livery, icon, desc }) => ({ id, kind, slot, category, name, price, status, active, thumbnail, gender, vehicleClass, body, paints, rims, model, asset, specs, license, livery, icon, desc }));
+  }
+
+  publicRentals() {
+    return RENTAL_CATALOG.filter((r) => r.active);
+  }
+
+  publicProperties() {
+    return PROPERTIES_CATALOG.filter((p) => p.active);
   }
 
   owns(playerId, itemId) {
@@ -54,13 +71,27 @@ export class ShopService {
 
   nearShop(p, shop) {
     const loc = SHOP_LOCATIONS[shop];
+    if (!loc) return false;
     const poi = POI_BY_ID.get(loc.poi);
-    return poi && Math.hypot(poi.x - p.x, poi.z - p.z) <= 14;
+    if (poi && Math.hypot(poi.x - p.x, poi.z - p.z) <= 16) return true;
+    if (loc.altPoi) {
+      const alt = POI_BY_ID.get(loc.altPoi);
+      if (alt && Math.hypot(alt.x - p.x, alt.z - p.z) <= 16) return true;
+    }
+    return false;
   }
 
-  buy(p, itemId) {
+  buy(p, itemId, { reqId = null } = {}) {
     const item = this.byId.get(String(itemId));
     if (!item || !isSelectable(item)) throw new ShopError('Item indisponível.', 'unavailable');
+    if (item.kind === 'consumable') {
+      if (!this.nearShop(p, 'supermarket')) throw new ShopError(`Vai a ${SHOP_LOCATIONS.supermarket.name} para comprar.`, 'far');
+      const key = String(reqId ?? `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`).replace(/[^\w-]/g, '').slice(0, 40);
+      const r = this.ledger.purchase(p.id, `${item.id}#${key}`, item.price);
+      const consumables = r.duplicate ? this.store.consumablesOf(p.id) : this.store.addConsumable(p.id, item.id, 1);
+      if (!r.duplicate) this.store.audit('supermarket_purchase', { playerId: p.id, itemId: item.id, priceKz: item.price, txnId: r.txnId });
+      return { item, txnId: r.txnId, consumables, duplicate: !!r.duplicate };
+    }
     if (this.owns(p.id, item.id)) throw new ShopError('Já tens este item.', 'owned');
     const shop = item.kind === 'vehicle' ? 'dealership' : 'wardrobe';
     if (!this.nearShop(p, shop)) throw new ShopError(`Vai a ${SHOP_LOCATIONS[shop].name} para comprar.`, 'far');
@@ -68,6 +99,47 @@ export class ShopService {
     this.store.grantItem(p.id, item.id, 'compra_demo', r.txnId);
     this.store.audit('purchase', { playerId: p.id, itemId: item.id, priceKz: item.price, txnId: r.txnId });
     return { item, txnId: r.txnId };
+  }
+
+  rentVehicle(p, rentalId, now = Date.now()) {
+    const def = RENTAL_BY_ID.get(String(rentalId));
+    if (!def || !def.active) throw new ShopError('Veículo de aluguer indisponível.', 'unavailable');
+    if (!this.nearShop(p, 'rental')) throw new ShopError(`Vai a ${SHOP_LOCATIONS.rental.name} para alugar um veículo.`, 'far');
+    const contractId = `rent_${p.id}_${now}`;
+    const r = this.ledger.purchase(p.id, contractId, def.priceKz);
+    const expiresAt = now + def.durationMinutes * 60000;
+    const rentals = this.store.createRental({
+      id: contractId, playerId: p.id, rentalId: def.id, vehicleItemId: def.vehicleItemId,
+      vehicleClass: def.vehicleClass, priceKz: def.priceKz, startedAt: now, expiresAt, txnId: r.txnId,
+    });
+    this.store.audit('vehicle_rent', { playerId: p.id, contractId, rentalId: def.id, priceKz: def.priceKz, expiresAt });
+    return { contractId, def, rentals, txnId: r.txnId };
+  }
+
+  returnVehicle(p, contractId, now = Date.now()) {
+    const ok = this.store.returnRental(p.id, String(contractId));
+    if (!ok) throw new ShopError('Contrato de aluguer não encontrado ou já encerrado.', 'no_contract');
+    this.store.audit('vehicle_return', { playerId: p.id, contractId });
+    return { rentals: this.store.activeRentalsOf(p.id, now) };
+  }
+
+  acquireProperty(p, propertyId, mode = 'buy', now = Date.now()) {
+    const prop = PROPERTY_BY_ID.get(String(propertyId));
+    if (!prop || !prop.active) throw new ShopError('Imóvel indisponível.', 'unavailable');
+    if (!this.nearShop(p, 'realestate')) throw new ShopError(`Vai a ${SHOP_LOCATIONS.realestate.name} para comprar ou arrendar imóveis.`, 'far');
+    const existing = this.store.propertiesOf(p.id, now).find((x) => x.propertyId === prop.id && x.mode === 'buy');
+    if (existing) throw new ShopError('Já és proprietário deste imóvel.', 'owned');
+    const isBuy = mode === 'buy';
+    const priceKz = isBuy ? prop.buyPriceKz : prop.rentPriceKz;
+    const refId = `prop_${prop.id}_${isBuy ? 'buy' : `rent_${now}`}`;
+    const r = this.ledger.purchase(p.id, refId, priceKz);
+    const expiresAt = isBuy ? null : now + (prop.rentDays ?? 7) * 86400000;
+    const properties = this.store.upsertProperty({
+      playerId: p.id, propertyId: prop.id, buildingId: prop.buildingId,
+      mode: isBuy ? 'buy' : 'rent', priceKz, acquiredAt: now, expiresAt, txnId: r.txnId,
+    });
+    this.store.audit(isBuy ? 'property_buy' : 'property_rent', { playerId: p.id, propertyId: prop.id, priceKz, expiresAt, txnId: r.txnId });
+    return { prop, mode: isBuy ? 'buy' : 'rent', properties, txnId: r.txnId };
   }
 
   /** Normaliza e valida a aparência (inclui migração do formato antigo). */

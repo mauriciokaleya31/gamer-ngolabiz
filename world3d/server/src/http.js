@@ -151,6 +151,7 @@ export function createWorldServer({ world, env }) {
           return json(res, 200, { overrides: { catalog: cfg.catalog.overrides, emotes: cfg.emotes.overrides } }, cors);
         }
         if (path === '/admin/ledger/verify') return json(res, 200, world.ledger.verify(), cors);
+        if (path === '/admin/arena-matches') return json(res, 200, { rows: world.store.recentArenaMatches(Number(url.searchParams.get('limit')) || 50, url.searchParams.get('mode')) }, cors);
         if (path === '/admin/audit') return json(res, 200, { rows: world.store.recentAudit(Number(url.searchParams.get('limit')) || 50, url.searchParams.get('type')) }, cors);
         return json(res, 404, { error: 'rota admin desconhecida' }, cors);
       }
