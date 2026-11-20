@@ -20,6 +20,10 @@ import { DEFAULT_TRAINING_BOTS } from './competition/trainingBot.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const WORLD3D_ROOT = resolve(here, '..', '..');
+// Pasta server/ em si: onde ficam as cópias vendorizadas de web/ e shared/,
+// para a app continuar a servir o cliente mesmo quando implantada sozinha
+// (sem as pastas irmãs world3d/web e world3d/shared), ex.: Hostinger.
+export const SERVER_ROOT = resolve(here, '..');
 
 export function loadEnv(env = process.env) {
   const development = (env.WORLD3D_ENV ?? 'production') === 'development';

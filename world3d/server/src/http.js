@@ -9,7 +9,7 @@ import { bearer, resolveIdentity, verifyToken } from './auth.js';
 import { verifyRace } from './competition/race.js';
 import { ARCHETYPES } from './npc/archetypes.js';
 import { WEATHER_PRESETS } from './weather.js';
-import { WORLD3D_ROOT } from './config.js';
+import { SERVER_ROOT } from './config.js';
 import { exportZone } from './zoneExport.js';
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
@@ -51,8 +51,8 @@ export function createWorldServer({ world, env }) {
     if (rel.endsWith('/')) rel += 'index.html';
     const top = rel.split('/')[1];
     if (!STATIC_DIRS.includes(top)) return false;
-    const file = normalize(join(WORLD3D_ROOT, rel));
-    if (!file.startsWith(resolve(WORLD3D_ROOT, top))) return false;
+    const file = normalize(join(SERVER_ROOT, rel));
+    if (!file.startsWith(resolve(SERVER_ROOT, top))) return false;
     try {
       const s = await stat(file);
       if (!s.isFile()) return false;

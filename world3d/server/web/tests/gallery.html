@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt-AO">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Galeria de recursos · NgolaBiz World 3D</title>
+  <style>
+    body { margin: 0; background: #0e131b; color: #eef2f7; font-family: system-ui, sans-serif; overflow: hidden; }
+    #ui { position: fixed; left: 12px; top: 12px; background: rgba(0,0,0,.55); padding: 10px 12px; border-radius: 10px; font-size: 13px; max-width: 360px; }
+    #ui select, #ui button { margin: 3px 2px; }
+    canvas { display: block; }
+  </style>
+  <script type="importmap">{ "imports": { "three": "../vendor/three/three.module.min.js" } }</script>
+</head>
+<body>
+  <div id="ui">
+    <b>Galeria de recursos (evidência de integração)</b><br>
+    Vista: <select id="view"><option value="characters">Personagens</option><option value="faces">Rostos e expressões</option><option value="vehicles">Veículos</option></select>
+    Emote: <select id="emote"><option value="">—</option></select>
+    <div id="info"></div>
+  </div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { Humanoid2 } from '../js/character/humanoid2.js';
+    import { emoteAnimation } from '../js/character/emoteAnimations.js';
+    import { EMOTES } from '../../shared/emotes.js';
+    import { createVehicle } from '../js/vehicles2.js';
+
+    const q = new URLSearchParams(location.search);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.95;
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#1c2533');
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const envScene = new THREE.Scene();
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(50, 16, 12), new THREE.MeshBasicMaterial({ color: '#9fb6cf', side: THREE.BackSide }));
+    envScene.add(dome);
+    const floorEnv = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshBasicMaterial({ color: '#3a3a3a' }));
+    floorEnv.rotation.x = -Math.PI / 2; floorEnv.position.y = -2; envScene.add(floorEnv);
+    scene.environment = pmrem.fromScene(envScene, 0.04).texture;
+    scene.environmentIntensity = 0.7;
+    const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.05, 200);
+    scene.add(new THREE.HemisphereLight(0xdfe9ff, 0x3a2a20, 1.1));
+    const key = new THREE.DirectionalLight(0xffe7cc, 2.6);
+    key.position.set(3, 6, 5); key.castShadow = true; key.shadow.mapSize.set(2048, 2048);
+    Object.assign(key.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8 });
+    scene.add(key);
+    const rim = new THREE.DirectionalLight(0x9db4ff, 1.2); rim.position.set(-4, 3, -5); scene.add(rim);
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(30, 64), new THREE.MeshStandardMaterial({ color: '#3b4250', roughness: 0.6 }));
+    floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+
+    const LINEUP = [
+      { gender: 'f', skinTone: '#4a2c20', hairStyle: 'trancas', hairColor: '#1b1410', top: 'casaco_leve', topColor: '#eceff1', bottom: 'calca_cargo', bottomColor: '#4e342e', shoes: 'botas', shoesColor: '#5d4037', accessories: { wrist: 'relogio', ears: 'brincos' }, height: 1.68 },
+      { gender: 'm', skinTone: '#6b4430', hairStyle: 'degradê', hairColor: '#0d0b0a', top: 'colete', topColor: '#c62828', bottom: 'calca_cargo', bottomColor: '#a1887f', shoes: 'tenis_brancos', accessories: { back: 'mochila', wrist: 'relogio' }, face: { beard: 'barba_curta', shape: 2 }, height: 1.8 },
+      { gender: 'f', skinTone: '#5a3825', hairStyle: 'lenco', top: 'vestido', topColor: '#f9a825', topPattern: 'capulana', shoes: 'chinelos', shoesColor: '#3e2723', accessories: { ears: 'brincos' }, height: 1.66, bodyType: 'robusto' },
+      { gender: 'm', skinTone: '#3b2219', hairStyle: 'dreads', hairColor: '#1b1410', top: 'hoodie', topColor: '#263238', bottom: 'calca_ganga', bottomColor: '#1c2a48', shoes: 'tenis', shoesColor: '#d32f2f', accessories: { head: 'auscultadores', eyes: 'oculos_sol' }, height: 1.77 },
+      { gender: 'f', skinTone: '#8d5d3f', hairStyle: 'afro', hairColor: '#2b1d16', top: 'blusa', topColor: '#00897b', bottom: 'saia_capulana', bottomColor: '#6a1b9a', shoes: 'sapatos', shoesColor: '#212121', accessories: { neck: 'fio', eyes: 'oculos' }, height: 1.62, bodyType: 'magro' },
+      { gender: 'm', skinTone: '#7a4f37', hairStyle: 'curto', hairColor: '#0d0b0a', top: 'camisa_capulana', topColor: '#1565c0', topPattern: 'capulana', bottom: 'calcoes', bottomColor: '#c5b38a', shoes: 'chinelos', shoesColor: '#212121', accessories: { head: 'bone', neck: 'fio' }, face: { beard: 'bigode', shape: 1 }, height: 1.72, bodyType: 'robusto' },
+      { gender: 'm', skinTone: '#4a2c20', hairStyle: 'careca', top: 'uniforme_seguranca', topColor: '#1a237e', bottom: 'calca', bottomColor: '#1a237e', shoes: 'botas', shoesColor: '#111111', accessories: { head: 'bone' }, face: { beard: 'pera', shape: 3 }, height: 1.85, posture: 'confiante' },
+      { gender: 'f', skinTone: '#b97b54', hairStyle: 'coque', hairColor: '#bdbdbd', top: 'casaco_leve', topColor: '#8d6e63', bottom: 'calca', bottomColor: '#455a64', shoes: 'sapatos', shoesColor: '#4e342e', accessories: { eyes: 'oculos' }, height: 1.58, posture: 'curvada' },
+    ];
+
+    const group = new THREE.Group(); scene.add(group);
+    const actors = [];
+    let view = q.get('view') ?? 'characters';
+    document.getElementById('view').value = view;
+    const sel = document.getElementById('emote');
+    for (const e of EMOTES) sel.add(new Option(`${e.icon} ${e.name}`, e.id));
+    sel.value = q.get('emote') ?? '';
+
+    function build() {
+      group.clear(); actors.length = 0;
+      if (view === 'vehicles') {
+        const kinds = (q.get('kinds') ?? 'sedan_kianda,hatch_muxima,suv_namibe,carrinha_lobito,candongueiro,moto_ngola,moto_kupapata,desportivo_gt').split(',');
+        kinds.forEach((id, i) => {
+          const v = createVehicle(id, { paint: ['#b71c1c', '#0d47a1', '#f5f5f5', '#1b5e20', null, '#212121', null, 'Carmine Candy'][i], rims: ['classica', 'desportiva', 'cromada', 'classica', 'classica', 'classica', 'classica', 'original'][i] });
+          v.root.position.set(kinds.length === 1 ? 0 : (i % 4) * 5.2 - 7.8, 0, kinds.length === 1 ? 0 : Math.floor(i / 4) * -6.5 + 2);
+          v.root.rotation.y = -0.6;
+          v.setLights(i % 2 === 0, i === 3);
+          group.add(v.root); actors.push(v);
+        });
+        if (kinds.length === 1) { camera.position.set(4.5, 2.2, 6.5); camera.lookAt(0, 0.7, 0); } else { camera.position.set(4, 7.5, 16); camera.lookAt(0, 0.6, -1.5); }
+        return;
+      }
+      const list = view === 'faces' ? LINEUP.slice(0, 4) : LINEUP;
+      list.forEach((a, i) => {
+        const h = new Humanoid2(a);
+        const spacing = view === 'faces' ? 0.55 : 1.05;
+        h.root.position.set((i - (list.length - 1) / 2) * spacing, 0, 0);
+        h.root.rotation.y = view === 'faces' ? 0 : (i % 2 ? -0.25 : 0.25);
+        group.add(h.root); actors.push(h);
+        if (view === 'faces') {
+          const expr = ['surpresa', 'rir', 'tristeza', 'positivo'][i];
+          const fn = emoteAnimation(expr); h.playEmote(expr, (t, hh) => fn(Math.min(t, 0.9), hh));
+        }
+      });
+      if (view === 'faces') { camera.position.set(0, 1.62, 1.55); camera.lookAt(0, 1.6, 0); camera.fov = 30; }
+      else { camera.position.set(0, 1.35, 7.2); camera.lookAt(0, 0.95, 0); camera.fov = 35; }
+      camera.updateProjectionMatrix();
+      applyEmote();
+    }
+    function applyEmote() {
+      if (view !== 'characters') return;
+      const id = sel.value;
+      actors.forEach((h, i) => {
+        if (!id) { h.stopEmote(); h.setAnim(q.get('anim') ?? (i % 3 === 1 ? 'talk' : 'idle')); return; }
+        const fn = emoteAnimation(id); h.playEmote(id, fn, { startedAtMs: performance.now() - 600 - i * 90 });
+      });
+    }
+    document.getElementById('view').onchange = (e) => { view = e.target.value; build(); };
+    sel.onchange = applyEmote;
+    build();
+    let last = performance.now();
+    function loop(now) {
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      for (const a of actors) a.update ? a.update(dt, 0) : a.animate?.(dt, 0, 0);
+      renderer.render(scene, camera);
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+    window.__gallery = { ready: true, actors };
+    addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
+  </script>
+</body>
+</html>
