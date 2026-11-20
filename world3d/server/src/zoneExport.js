@@ -3,8 +3,8 @@
  * ferramentas externas). O UE5 usa estes dados para colocar blocos/actores de
  * referência (blockout) e POIs; a arte final é feita no editor.
  */
-import { ZONE_ID, ZONE_BOUNDS, ROADS, BUILDINGS, POIS, PROPS, BENCHES, INTERSECTIONS, TRAFFIC_LIGHTS, TRAFFIC_LOOPS, PARKED_VEHICLES, RACE_TRACK, PATROL_ROUTES, PLAYER_SPAWNS, DISTRICTS, sidewalkRects } from '../../shared/zone.js';
-import { REFERENCE_LOCATION, WORLD_TIME_ZONE } from '../../shared/time.js';
+import { ZONE_ID, ZONE_BOUNDS, ROADS, BUILDINGS, POIS, PROPS, BENCHES, INTERSECTIONS, TRAFFIC_LIGHTS, TRAFFIC_LOOPS, PARKED_VEHICLES, RACE_TRACK, PATROL_ROUTES, PLAYER_SPAWNS, DISTRICTS, sidewalkRects } from '../shared/zone.js';
+import { REFERENCE_LOCATION, WORLD_TIME_ZONE } from '../shared/time.js';
 
 export function exportZone() {
   return {

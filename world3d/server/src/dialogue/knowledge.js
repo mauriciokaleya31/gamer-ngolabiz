@@ -3,7 +3,7 @@
  * (respostas locais e contexto enviado ao modelo de linguagem). Assim os NPCs não
  * inventam funcionalidades que não existem.
  */
-import { POIS, ROADS, RACE_TRACK, trackLength } from '../../../shared/zone.js';
+import { POIS, ROADS, RACE_TRACK, trackLength } from '../../shared/zone.js';
 
 export const PLACES = [
   { key: 'mercado', poi: 'mercado_balcao', name: 'Mercado Kianda', aliases: ['mercado', 'supermercado', 'mercearia', 'compras'] },

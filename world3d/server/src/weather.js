@@ -6,7 +6,7 @@
  * Consequências reais: chuva → humidade das superfícies (wetness) que seca devagar,
  * visibilidade/neblina, NPCs procuram abrigo, áudio de chuva no cliente.
  */
-import { makeRng } from '../../shared/rng.js';
+import { makeRng } from '../shared/rng.js';
 
 export const WEATHER_PRESETS = {
   limpo: { cloud: 0.1, fog: 0.0, rain: 0.0, wind: 0.2 },

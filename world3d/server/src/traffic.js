@@ -3,8 +3,8 @@
  * respeitam semáforos, mantêm distância ao veículo da frente e cedem a peões.
  * A densidade varia com a hora virtual de Luanda (horas de ponta, noite calma).
  */
-import { TRAFFIC_LOOPS, THROUGH_LOOPS, TRAFFIC_LIGHTS, RACE_TRACK, trafficLightState } from '../../shared/zone.js';
-import { makeRng } from '../../shared/rng.js';
+import { TRAFFIC_LOOPS, THROUGH_LOOPS, TRAFFIC_LIGHTS, RACE_TRACK, trafficLightState } from '../shared/zone.js';
+import { makeRng } from '../shared/rng.js';
 
 const CAR_COLORS = ['#f5f5f5', '#212121', '#b71c1c', '#0d47a1', '#9e9e9e', '#1b5e20', '#f9a825', '#4e342e', '#cfd8dc', '#263238', '#e65100'];
 const TAXI_COLORS = ['#1565c0']; // candongueiros azuis e brancos (ícone luandense)

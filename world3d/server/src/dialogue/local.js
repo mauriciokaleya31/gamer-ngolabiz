@@ -5,7 +5,7 @@
  *  - como alternativa quando o serviço de IA está desligado, sem orçamento ou falha.
  */
 import { findPlace, directions, COMPETITION_FACTS } from './knowledge.js';
-import { formatClock, localParts } from '../../../shared/time.js';
+import { formatClock, localParts } from '../../shared/time.js';
 
 /** Padrões aplicados ao texto normalizado (minúsculas, sem acentos). */
 export const INTENTS = [

@@ -4,8 +4,8 @@
  * habitantes, o que permite aumentar/reduzir a população sem "baralhar" os existentes:
  * o NPC n.º k é sempre o mesmo para uma dada semente.
  */
-import { makeRng, hashString } from '../../../shared/rng.js';
-import { POIS } from '../../../shared/zone.js';
+import { makeRng, hashString } from '../../shared/rng.js';
+import { POIS } from '../../shared/zone.js';
 import { ARCHETYPES, DEFAULT_ARCHETYPE_WEIGHTS, ARCHETYPE_MINIMUMS } from './archetypes.js';
 
 const NAMES = {

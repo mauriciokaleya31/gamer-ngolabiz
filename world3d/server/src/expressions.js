@@ -4,7 +4,7 @@
  * depois também ver o emote) e difunde o evento aos jogadores próximos com o
  * instante do servidor, para que todos os clientes sincronizem a animação.
  */
-import { EMOTES, ALLOWED_EMOJIS, EMOTE_LIMITS } from '../../shared/emotes.js';
+import { EMOTES, ALLOWED_EMOJIS, EMOTE_LIMITS } from '../shared/emotes.js';
 
 export class ExpressionError extends Error {
   constructor(message, code) { super(message); this.code = code; }

@@ -10,9 +10,9 @@
  * Nenhum modelo de linguagem é usado aqui: rotinas, navegação e decisões são
  * determinísticas e locais. O diálogo IA é um serviço à parte (dialogue/gateway.js).
  */
-import { makeRng, hashString } from '../../../shared/rng.js';
-import { POIS, PATROL_ROUTES, trafficLightState, RACE_TRACK } from '../../../shared/zone.js';
-import { localParts } from '../../../shared/time.js';
+import { makeRng, hashString } from '../../shared/rng.js';
+import { POIS, PATROL_ROUTES, trafficLightState, RACE_TRACK } from '../../shared/zone.js';
+import { localParts } from '../../shared/time.js';
 import { ARCHETYPES } from './archetypes.js';
 
 const POI_BY_ID = new Map(POIS.map((p) => [p.id, p]));

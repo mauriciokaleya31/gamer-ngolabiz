@@ -3,7 +3,7 @@
  * estar sincronizado por NTP/chrony no anfitrião). O cliente nunca define a hora:
  * recebe o estado do relógio e estima o desvio (offset) com base no RTT.
  */
-import { makeClockState, rebaseClock, virtualNow, localParts, sunPosition, sunTimes, daylightFactors, dayPeriod, WORLD_TIME_ZONE, REFERENCE_LOCATION } from '../../shared/time.js';
+import { makeClockState, rebaseClock, virtualNow, localParts, sunPosition, sunTimes, daylightFactors, dayPeriod, WORLD_TIME_ZONE, REFERENCE_LOCATION } from '../shared/time.js';
 
 export class WorldClock {
   /**

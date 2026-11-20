@@ -5,8 +5,8 @@
  * - A aparência pedida pelo cliente é validada: itens não possuídos, inactivos,
  *   indisponíveis ou incompatíveis são substituídos pelo item base.
  */
-import { effectiveCatalog, isSelectable, OPTIONAL_SLOTS, PAINT_PALETTE, RENTAL_CATALOG, PROPERTIES_CATALOG } from '../../shared/catalog.js';
-import { POIS } from '../../shared/zone.js';
+import { effectiveCatalog, isSelectable, OPTIONAL_SLOTS, PAINT_PALETTE, RENTAL_CATALOG, PROPERTIES_CATALOG } from '../shared/catalog.js';
+import { POIS } from '../shared/zone.js';
 
 export const SHOP_LOCATIONS = {
   wardrobe: { poi: 'loja_muxima_porta', name: 'Moda Muxima', kinds: ['clothing'] },

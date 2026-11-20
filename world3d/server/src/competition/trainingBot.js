@@ -5,7 +5,7 @@
  * velocidade fixa por dificuldade, e o resultado é decidido pela mesma validação
  * de pontos de controlo usada para os humanos.
  */
-import { RACE_TRACK } from '../../../shared/zone.js';
+import { RACE_TRACK } from '../../shared/zone.js';
 
 export const BOT_SPEEDS = { facil: 15, medio: 20, dificil: 25 };
 

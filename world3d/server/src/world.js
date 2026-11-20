@@ -3,9 +3,9 @@
  * diálogo, competições, economia demo e jogadores; corre o ciclo de simulação
  * (10 Hz) e envia snapshots com gestão de interesse a cada cliente.
  */
-import { buildNavGraph } from '../../shared/nav.js';
-import { POIS, PARKED_VEHICLES, ZONE_BOUNDS, PLAYER_SPAWNS } from '../../shared/zone.js';
-import { formatClock, localParts } from '../../shared/time.js';
+import { buildNavGraph } from '../shared/nav.js';
+import { POIS, PARKED_VEHICLES, ZONE_BOUNDS, PLAYER_SPAWNS } from '../shared/zone.js';
+import { formatClock, localParts } from '../shared/time.js';
 import { WorldClock } from './clock.js';
 import { WeatherSystem } from './weather.js';
 import { TrafficSystem } from './traffic.js';
@@ -20,8 +20,8 @@ import { defaultAdminConfig, mergeAdminConfig } from './config.js';
 import { ExpressionService } from './expressions.js';
 import { ShopService, GARAGE_SPAWN, RENTAL_SPAWN, SHOP_LOCATIONS, ShopError } from './shop.js';
 import { ArenaModesManager, ArenaError, COMPETITION_CENTERS } from './competition/arenaModes.js';
-import { EMOTE_LIMITS } from '../../shared/emotes.js';
-import { PROPERTIES_CATALOG } from '../../shared/catalog.js';
+import { EMOTE_LIMITS } from '../shared/emotes.js';
+import { PROPERTIES_CATALOG } from '../shared/catalog.js';
 
 const POI_NAME = new Map(POIS.map((p) => [p.id, p.name]));
 const MAX_SPEED = { foot: 9.5, car: 62, moto: 66 };

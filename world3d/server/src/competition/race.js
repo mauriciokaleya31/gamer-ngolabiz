@@ -10,7 +10,7 @@
  * participam em corridas gratuitas (stake = 0).
  */
 import { createHash, randomUUID } from 'node:crypto';
-import { RACE_TRACK, RACE_TRACKS, trackLength } from '../../../shared/zone.js';
+import { RACE_TRACK, RACE_TRACKS, trackLength } from '../../shared/zone.js';
 import { ALLOWED_STAKES_KZ } from '../economy/ledger.js';
 import { TrainingBotDriver } from './trainingBot.js';
 
