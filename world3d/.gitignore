@@ -1,4 +1,6 @@
 # Dependências e dados gerados (reconstruíveis)
+node_modules/
+package-lock.json
 server/node_modules/
 server/data/
 *.sqlite

@@ -1,0 +1,15 @@
+{
+  "name": "ngolabiz-world3d",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NgolaBiz World 3D — raiz de implantação: servidor (server/), cliente web estático (web/) e código partilhado (shared/), servidos juntos pelo mesmo processo Node.js. Usar como 'Diretório raiz' em plataformas de alojamento Node.js (ex.: Hostinger) que só suportam uma pasta de implantação, para que o servidor encontre a pasta shared/ ao lado da server/.",
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server/src/index.js",
+    "dev": "WORLD3D_ENV=development node --disable-warning=ExperimentalWarning server/src/index.js"
+  },
+  "dependencies": {
+    "ws": "8.21.3"
+  }
+}
