@@ -27,7 +27,8 @@ export function loadEnv(env = process.env) {
   if (!secret) throw new Error('WORLD3D_JOIN_SECRET é obrigatório em produção.');
   return {
     development,
-    port: Number(env.WORLD3D_PORT ?? 8787),
+    // PORT é definida automaticamente por algumas plataformas de alojamento Node.js (ex.: Hostinger)
+    port: Number(env.WORLD3D_PORT ?? env.PORT ?? 8787),
     host: env.WORLD3D_HOST ?? '0.0.0.0',
     dbPath: env.WORLD3D_DB ?? resolve(WORLD3D_ROOT, 'server', 'data', 'world3d.sqlite'),
     joinSecret: secret,
