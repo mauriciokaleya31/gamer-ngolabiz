@@ -22,8 +22,8 @@ export const WINDOW_UNIFORMS = {
   uWarm: { value: new THREE.Color('#ffcf8a') },
 };
 
-function windowMaterial(map, emissiveMap, { rough = 0.85, metal = 0.0, warm = true } = {}) {
-  const m = new THREE.MeshStandardMaterial({ map, emissiveMap, emissive: 0xffffff, roughness: rough, metalness: metal });
+function windowMaterial(map, emissiveMap, { rough = 0.85, metal = 0.0, warm = true, normalMap = null } = {}) {
+  const m = new THREE.MeshStandardMaterial({ map, emissiveMap, normalMap, emissive: 0xffffff, roughness: rough, metalness: metal });
   m.onBeforeCompile = (shader) => {
     shader.uniforms.uLitFraction = WINDOW_UNIFORMS.uLitFraction;
     shader.uniforms.uNight = WINDOW_UNIFORMS.uNight;
@@ -286,7 +286,7 @@ export class City {
       if (b.type === 'house') {
         const tex = houseTexture(b.color, b.id);
         const geo = wallsGeometry(b, 0, b.height, 10, 6.4, rng.next());
-        this.add(new THREE.Mesh(geo, windowMaterial(tex.map, tex.emissive)), { cast: true });
+        this.add(new THREE.Mesh(geo, windowMaterial(tex.map, tex.emissive, { normalMap: tex.normal })), { cast: true });
         if (b.roof === 'gable') this.add(gableRoof(b, rng.pick(['#9c4a2f', '#b5552f', '#7d3b25'])), { cast: true });
         else roofGeos.push(planeXZ(b.minX, b.maxX, b.minZ, b.maxZ, b.height, 4));
         if (rng.chance(0.6)) tanks.push([b.minX + 1.5 + rng.next() * (b.maxX - b.minX - 3), b.height + (b.roof === 'gable' ? 1.5 : 0), b.minZ + 1.5 + rng.next() * (b.maxZ - b.minZ - 3)]);
@@ -300,7 +300,7 @@ export class City {
       const groundBand = commercial ? Math.min(4.2, b.height) : 0;
       if (b.height > groundBand) {
         const geo = wallsGeometry(b, groundBand, b.height, tileW, tileH, rng.next());
-        const m = windowMaterial(tex.map, tex.emissive, { rough: b.glass ? 0.15 : 0.85, metal: b.glass ? 0.5 : 0, warm: !b.glass && b.type !== 'office' });
+        const m = windowMaterial(tex.map, tex.emissive, { rough: b.glass ? 0.15 : 0.85, metal: b.glass ? 0.5 : 0, warm: !b.glass && b.type !== 'office', normalMap: tex.normal });
         this.add(new THREE.Mesh(geo, m), { cast: true });
         if (b.glass) this.wetMaterials.push({ mat: m, glass: true });
       }
@@ -393,14 +393,14 @@ export class City {
       if (b.type === 'house') {
         const tex = houseTexture(b.color, b.id);
         const geo = wallsGeometry(b, groundH, b.height, 10, 6.4, rng.next());
-        this.add(new THREE.Mesh(geo, windowMaterial(tex.map, tex.emissive)), { cast: true });
+        this.add(new THREE.Mesh(geo, windowMaterial(tex.map, tex.emissive, { normalMap: tex.normal })), { cast: true });
       } else {
         const style = b.type === 'hotel' ? 'office' : 'residential';
         const tex = facadeTextures(style, b.color, b.id.length % 3);
         const tileW = FACADE_TILE.bays * FACADE_TILE.bayW;
         const tileH = FACADE_TILE.floors * (b.height / b.floors);
         const geo = wallsGeometry(b, groundH, b.height, tileW, tileH, rng.next());
-        this.add(new THREE.Mesh(geo, windowMaterial(tex.map, tex.emissive, { rough: 0.85 })), { cast: true });
+        this.add(new THREE.Mesh(geo, windowMaterial(tex.map, tex.emissive, { rough: 0.85, normalMap: tex.normal })), { cast: true });
       }
     }
 
@@ -920,7 +920,7 @@ export class City {
       items.push([x, z, 12 + rng.next() * 22, 12 + rng.next() * 22, 10 + rng.next() * (r < 450 ? 55 : 90)]);
     }
     const tex = facadeTextures('office', '#8c99a6', 7);
-    const m = windowMaterial(tex.map, tex.emissive, { warm: true });
+    const m = windowMaterial(tex.map, tex.emissive, { warm: true, normalMap: tex.normal });
     const geos = items.map(([x, z, w, d, h]) => {
       const b = { minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2 };
       return wallsGeometry(b, 0, h, 14, 12.8, rng.next());

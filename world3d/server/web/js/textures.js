@@ -141,11 +141,21 @@ export function facadeTextures(style, color, seed) {
   const H = 512;
   const [c, g] = canvas(W, H);
   const [ce, ge] = canvas(W, H);
+  const [cn, gn] = canvas(W, H);
   const rng = makeRng(key);
   const bw = W / FACADE_TILE.bays;
   const fh = H / FACADE_TILE.floors;
   g.fillStyle = color;
   g.fillRect(0, 0, W, H);
+  // mapa de normal: plano por omissão (sem relevo); ganha relevo nas molduras das janelas
+  gn.fillStyle = 'rgb(128,128,255)';
+  gn.fillRect(0, 0, W, H);
+  // granulação subtil do reboco (perturbação leve do normal, não só da cor)
+  for (let i = 0; i < 2600; i++) {
+    const t = rng.next() < 0.5 ? -1 : 1;
+    gn.fillStyle = `rgb(${128 + t * 10},${128 + (rng.next() < 0.5 ? -1 : 1) * 10},255)`;
+    gn.fillRect(rng.next() * W, rng.next() * H, 2, 2);
+  }
   // textura de reboco/betão
   const col = new THREE.Color(color);
   for (let i = 0; i < 9000; i++) {
@@ -198,6 +208,12 @@ export function facadeTextures(style, color, seed) {
       const intensity = 0.55 + rng.next() * 0.45;
       ge.fillStyle = `rgb(${Math.round(threshold * 255)},${Math.round(intensity * 255)},0)`;
       ge.fillRect(wx, wy, ww, wh);
+      // relevo da moldura (janela recuada em relação à parede): bisel nas 4 arestas
+      const bt = glassy ? 2 : 4;
+      gn.fillStyle = 'rgb(128,80,255)'; gn.fillRect(wx - bt, wy - bt, ww + bt * 2, bt); // topo
+      gn.fillStyle = 'rgb(128,176,255)'; gn.fillRect(wx - bt, wy + wh, ww + bt * 2, bt); // base
+      gn.fillStyle = 'rgb(80,128,255)'; gn.fillRect(wx - bt, wy, bt, wh); // esquerda
+      gn.fillStyle = 'rgb(176,128,255)'; gn.fillRect(wx + ww, wy, bt, wh); // direita
     }
   }
   // ar condicionados (detalhe de uso quotidiano)
@@ -209,7 +225,7 @@ export function facadeTextures(style, color, seed) {
       g.fillRect(b * bw + bw * 0.62, f * fh + fh * 0.8, 22, 12);
     }
   }
-  const out = { map: toTexture(c), emissive: toTexture(ce, { srgb: false }) };
+  const out = { map: toTexture(c), emissive: toTexture(ce, { srgb: false }), normal: toTexture(cn, { srgb: false }) };
   out.emissive.magFilter = THREE.NearestFilter;
   out.emissive.minFilter = THREE.NearestFilter;
   out.emissive.generateMipmaps = false;

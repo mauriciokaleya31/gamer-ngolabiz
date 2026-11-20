@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Verificação do mapa de normal das fachadas</title>
+  <style>body{margin:0;background:#161b22;display:flex;gap:4px;color:#eef2f7;font-family:system-ui}
+    .col{display:flex;flex-direction:column;align-items:center}</style>
+  <script type="importmap">{ "imports": { "three": "../vendor/three/three.module.min.js" } }</script>
+</head>
+<body>
+  <script type="module">
+    import * as THREE from 'three';
+    import { facadeTextures } from '../js/textures.js';
+
+    function makeViewer(label, withNormal) {
+      const col = document.createElement('div');
+      col.className = 'col';
+      const h = document.createElement('div');
+      h.textContent = label;
+      col.appendChild(h);
+      document.body.appendChild(col);
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(420, 620);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      col.appendChild(renderer.domElement);
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color('#223');
+      const camera = new THREE.PerspectiveCamera(32, 420 / 620, 0.1, 100);
+      camera.position.set(0, 0, 8.5);
+      const key = new THREE.DirectionalLight(0xfff1dd, 3);
+      key.position.set(7, 3, 3); // luz lateral realista (pôr-do-sol), não exagerada
+      scene.add(key);
+      scene.add(new THREE.AmbientLight(0x40424a, 0.55));
+      const tex = facadeTextures('office', '#8c99a6', 1);
+      const mat = new THREE.MeshStandardMaterial({ map: tex.map, normalMap: withNormal ? tex.normal : null, roughness: 0.55, metalness: 0.1 });
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(6, 9), mat);
+      scene.add(plane);
+      renderer.render(scene, camera);
+    }
+    makeViewer('Antes (sem normal map)', false);
+    makeViewer('Depois (com normal map procedural)', true);
+    window.__ready = true;
+  </script>
+</body>
+</html>
