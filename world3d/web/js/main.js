@@ -19,6 +19,10 @@ import { Hud } from './hud.js';
 import { Soundscape } from './audio.js';
 import { CharacterCreator, defaultAppearance } from './creator.js';
 import { pickQuality, QUALITY_PROFILES } from './quality.js';
+import { EffectComposer } from '../vendor/three/postprocessing/EffectComposer.js';
+import { RenderPass } from '../vendor/three/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from '../vendor/three/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from '../vendor/three/postprocessing/OutputPass.js';
 
 const $ = (id) => document.getElementById(id);
 let quality = pickQuality();
@@ -49,10 +53,24 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.25, quality.far);
 camera.position.set(0, 6, -10);
 camera.lookAt(0, 2, -40);
+
+// pós-processamento: brilho (bloom) nas luzes e janelas iluminadas à noite.
+// Desligado na qualidade "baixa" (telemóveis/GPUs fracas) por custo de desempenho.
+let composer = null;
+if (quality.bloom) {
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.55, 0.4, 0.86);
+  composer.addPass(bloom);
+  composer.addPass(new OutputPass());
+}
+function renderFrame() { if (composer) composer.render(); else renderer.render(scene, camera); }
+
 addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
+  composer?.setSize(innerWidth, innerHeight);
 });
 
 const city = new City(scene, { quality });
@@ -579,7 +597,7 @@ function loop(now) {
   const step = player.consumeFootstep();
   if (step) audio.footstep(step, inPark ? 'relva' : inInterior ? 'interior' : 'rua');
 
-  renderer.render(scene, camera);
+  renderFrame();
   frames++;
   fpsAcc += dt;
   if (fpsAcc > 1) { window.__w3d.fps = Math.round(frames / fpsAcc); frames = 0; fpsAcc = 0; }
@@ -595,7 +613,7 @@ function idleLoop() {
   const t = performance.now() / 9000;
   camera.position.set(Math.sin(t) * 40, 18, -40 + Math.cos(t) * 40);
   camera.lookAt(0, 4, -40);
-  renderer.render(scene, camera);
+  renderFrame();
   requestAnimationFrame(idleLoop);
 }
 requestAnimationFrame(idleLoop);
