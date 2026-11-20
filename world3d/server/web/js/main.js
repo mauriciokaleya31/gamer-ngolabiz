@@ -461,7 +461,12 @@ function bindGameKeys() {
       }
       case 'KeyF': {
         if (race) break;
-        if (player.vehicle) { player.exitVehicle({ keepModel: true }); net.send({ t: 'vehicle_exit' }); break; }
+        if (player.vehicle) {
+          if (player.vehicle.kind === 'aviao' && !player.vehicle.phys.grounded) { hud.toast('Aterra primeiro para sair do avião.', 'bad'); break; }
+          player.exitVehicle({ keepModel: true });
+          net.send({ t: 'vehicle_exit' });
+          break;
+        }
         const v = actors.nearestParked(player.pos.x, player.pos.z);
         if (v) net.send({ t: 'vehicle_enter', id: v.id });
         break;
@@ -539,12 +544,14 @@ function loop(now) {
     const shopLabel = { wardrobe: 'Loja Moda Muxima', dealership: 'Concessionário Kalunga', garage: 'Garagem Kalunga', betting: 'Casa de Apostas & Desafios' };
     const shopTxt = shopHere ? ` · <kbd>B</kbd>${shopLabel[shopHere] ?? 'Loja'}` : '';
     if (npc) { const p = actors.npcProfiles.get(npc.id); hud.setPrompt(`<kbd>E</kbd>Falar com ${p.name} <span class="badge">${p.role}</span>${shopTxt}`); }
-    else if (veh && !race) hud.setPrompt(`<kbd>F</kbd>Conduzir ${veh.kind === 'moto' ? 'mota 🏍️' : 'carro 🚗'}`);
+    else if (veh && !race) hud.setPrompt(`<kbd>F</kbd>${veh.kind === 'aviao' ? 'Pilotar avião ✈️' : veh.kind === 'moto' ? 'Conduzir mota 🏍️' : 'Conduzir carro 🚗'}`);
     else if (pl) hud.setPrompt(`<kbd>P</kbd>Perfil / Desafiar ${pl.name} <span class="badge human">ONLINE</span>`);
     else {
       const shop = Object.keys(shopPositions).find((k) => nearShop(k));
       hud.setPrompt(shop ? `<kbd>B</kbd>${shopLabel[shop] ?? 'Abrir'} — ${shopPositions[shop].name}` : null);
     }
+  } else if (player.mode === 'vehicle' && player.vehicle?.kind === 'aviao' && !race) {
+    hud.setPrompt(player.vehicle.phys.grounded ? '<kbd>W/S</kbd>Motor · <kbd>↑↓</kbd>Nariz · <kbd>←→</kbd>Inclinar/curva · <kbd>F</kbd>Sair' : '<kbd>W/S</kbd>Motor · <kbd>↑↓</kbd>Nariz · <kbd>←→</kbd>Inclinar/curva · (aterra para sair)');
   } else if (player.mode === 'vehicle' && !race) hud.setPrompt('<kbd>F</kbd>Sair do veículo · <kbd>H</kbd>Buzina');
   else hud.setPrompt(null);
   hud.setSpeed(player.speedKmh(), player.mode === 'vehicle');

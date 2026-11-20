@@ -422,11 +422,79 @@ class GTCar {
   }
 }
 
+// ------------------------------------------------------------ Avião de turismo (procedural)
+/**
+ * Monomotor ligeiro simples: fuselagem afunilada, asa alta, estabilizadores,
+ * canópia de vidro, hélice animada e trem de aterragem fixo (3 rodas). Modelo
+ * 100% procedural e original (nenhum ficheiro externo), ao mesmo nível de
+ * detalhe dos outros veículos v2.
+ */
+class ProceduralPlane {
+  constructor(itemId, { paint } = {}) {
+    this.kind = 'aviao';
+    this.itemId = itemId;
+    this.root = new THREE.Group();
+    this.body = new THREE.Group();
+    this.root.add(this.body);
+    const color = paint ?? '#e9e3d5';
+    const pm = paintMat(color);
+    const trimC = trimMat();
+    const add = (g, m, p, r = [0, 0, 0], parent = this.body) => { const mesh = new THREE.Mesh(g, m); mesh.position.set(...p); mesh.rotation.set(...r); mesh.castShadow = true; parent.add(mesh); return mesh; };
+
+    // fuselagem: cápsula afunilada, nariz a +Z
+    const fuse = add(cg('p_fuse', () => { const g = new THREE.CapsuleGeometry(0.42, 3.1, 6, 12); g.rotateX(Math.PI / 2); g.scale(1, 1, 1); return g; }), pm, [0, 1.0, 0]);
+    fuse.scale.set(0.82, 0.92, 1);
+    // canópia (cockpit)
+    add(cg('p_canopy', () => { const g = new THREE.SphereGeometry(0.33, 14, 10, 0, Math.PI * 2, 0, Math.PI / 1.7); return g; }), glassMat(), [0, 1.32, 0.35], [Math.PI / 2, 0, 0]);
+    // asa alta (uma peça a atravessar a fuselagem)
+    add(cg('p_wing', () => new THREE.BoxGeometry(6.4, 0.1, 1.05)), pm, [0, 1.62, 0.05]);
+    add(cg('p_wingstrut_l', () => { const g = new THREE.CylinderGeometry(0.03, 0.03, 0.75, 6); return g; }), trimC, [1.1, 1.3, 0.1], [0, 0, 0.55]);
+    add(cg('p_wingstrut_r', () => { const g = new THREE.CylinderGeometry(0.03, 0.03, 0.75, 6); return g; }), trimC, [-1.1, 1.3, 0.1], [0, 0, -0.55]);
+    // estabilizador vertical (cauda)
+    add(cg('p_fin', () => new THREE.BoxGeometry(0.08, 0.85, 0.75)), pm, [0, 1.55, -2.85], [0, 0, 0]);
+    // estabilizador horizontal
+    add(cg('p_tail', () => new THREE.BoxGeometry(1.7, 0.08, 0.55)), pm, [0, 1.12, -2.8]);
+    // motor + hélice
+    add(cg('p_cowl', () => new THREE.CylinderGeometry(0.4, 0.44, 0.35, 14)), cm('p_cowlm', () => new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.45, metalness: 0.6 })), [0, 1.0, 1.75], [Math.PI / 2, 0, 0]);
+    this.propeller = add(cg('p_prop', () => { const g = new THREE.BoxGeometry(0.12, 1.7, 0.04); return g; }), trimC, [0, 1.0, 1.95]);
+    // trem de aterragem fixo
+    const legGeo = cg('p_leg', () => new THREE.CylinderGeometry(0.025, 0.025, 0.55, 6));
+    add(legGeo, trimC, [0.75, 0.6, 0.55], [0, 0, 0.28]);
+    add(legGeo, trimC, [-0.75, 0.6, 0.55], [0, 0, -0.28]);
+    add(cg('p_tailwheel_leg', () => new THREE.CylinderGeometry(0.02, 0.02, 0.3, 6)), trimC, [0, 0.72, -2.9], [0.3, 0, 0]);
+    this.wheels = [];
+    for (const [x, z, r] of [[0.75, 0.42, 0.22], [-0.75, 0.42, 0.22], [0, -2.98, 0.11]]) {
+      const w = wheel(r, r * 0.4, 'classica');
+      w.position.set(x, r, z);
+      this.root.add(w);
+      this.wheels.push(w);
+    }
+    this.head = lamp(0xfff4d6);
+    add(cg('p_landlight', () => new THREE.CircleGeometry(0.05, 10)), this.head, [0, 1.0, 2.0]);
+    this.r = 0.22;
+  }
+
+  setLights(on) { this.head.emissiveIntensity = on ? 2.4 : 0.2; }
+
+  /** pitch/roll vêm da física de voo; speed acelera a hélice e as rodas. */
+  animate(dt, speed = 0, steer = 0, accel = 0, pitch = 0, roll = 0) {
+    void steer; void accel;
+    this.body.rotation.x = -pitch;
+    this.body.rotation.z = roll;
+    this.propeller.rotation.z += dt * (6 + Math.abs(speed) * 2.2);
+    const rot = (speed * dt) / this.r;
+    for (const w of this.wheels) w.userData.spin.rotation.x += rot;
+  }
+
+  setDoor() {}
+}
+
 /** Cria o modelo visual de um item do catálogo (ou de um tipo genérico de trânsito). */
 export function createVehicle(itemId, { paint = null, rims = null } = {}) {
   const item = CATALOG_BY_ID.get(itemId);
   if (!item) return new ProceduralCar(itemId, 'sedan', { paint: paint ?? PAINT_PALETTE[0] });
   if (item.model === 'glb') return new GTCar(itemId, item, { paint: paint ?? item.paints[0] });
+  if (item.vehicleClass === 'aviao') return new ProceduralPlane(itemId, { paint });
   if (item.vehicleClass === 'moto') return new ProceduralMoto(itemId, { paint, livery: item.livery });
   return new ProceduralCar(itemId, item.body, { paint: paint ?? PAINT_PALETTE[0], rims: rims ?? 'classica', livery: item.livery });
 }

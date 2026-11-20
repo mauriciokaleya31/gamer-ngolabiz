@@ -266,6 +266,9 @@ function generateBuildings() {
   add(building('arena_tiro', 10, 42, 118, 142, { name: 'Arena Táctica de Tiro & Sobrevivência', type: 'gym', district: 'competicoes', floors: 2, height: 8.8, face: 'S', interior: true, color: '#1e3a8a', openHours: [0, 24], sign: 'ARENA TÁCTICA & TIRO' }));
   add(building('centro_corridas', 118, 152, 118, 142, { name: 'Autódromo & Centro de Corridas Kalunga', type: 'gym', district: 'competicoes', floors: 2, height: 8.2, face: 'S', interior: true, garageDoor: true, color: '#b45309', openHours: [0, 24], sign: 'CENTRO DE CORRIDAS' }));
 
+  // 5. Aeroporto Kianda (Este, fora do anel de corrida, a leste da Rua do Polo Industrial)
+  add(building('hangar_aeroporto', 180, 212, 150, 175, { name: 'Aeroporto Kianda — Hangar & Terminal', type: 'warehouse', district: 'aeroporto', floors: 1, height: 9, face: 'S', color: '#64748b', sign: 'AEROPORTO KIANDA' }));
+
   for (const b of B) {
     if (!b.height) b.height = b.floors * 3.2 + (b.roof === 'gable' ? 0.4 : 0.6);
     b.homeSlots = b.type === 'house' ? 3 : b.type === 'apartment' ? Math.min(12, b.floors * 2) : 0;
@@ -491,7 +494,21 @@ export const PARKED_VEHICLES = Object.freeze([
   { id: 'combate_car_1', kind: 'car', x: -26, z: 148, heading: -Math.PI / 2, usable: true },
   { id: 'tiro_moto_1', kind: 'moto', x: 24, z: 148, heading: -Math.PI / 2, usable: true },
   { id: 'corridas_car_1', kind: 'car', x: 132, z: 148, heading: -Math.PI / 2, usable: true },
+  // Aeroporto Kianda: avião ligeiro na placa de estacionamento, virado para a pista
+  { id: 'aviao_kianda_1', kind: 'aviao', itemId: 'aviao_turismo', x: 196, z: 135, heading: Math.PI, usable: true },
 ]);
+
+/**
+ * Pista do Aeroporto Kianda (orientação Norte-Sul), fora do anel de corrida
+ * (que ocupa a Rua do Polo Industrial a x=165). Zona aberta usada só pelos
+ * aviões — não faz parte do grafo de navegação pedonal nem do trânsito.
+ */
+export const AIRPORT_RUNWAY = Object.freeze({
+  id: 'pista_aeroporto_kianda',
+  minX: 185, maxX: 209, minZ: 18, maxZ: 132,
+  heading: 0, // rumo Norte (decolagem/aterragem ao longo de Z crescente→decrescente)
+  apron: { minX: 180, maxX: 212, minZ: 132, maxZ: 150 },
+});
 
 export const RACE_TRACKS = Object.freeze({
   circuito_anel_kianda: {

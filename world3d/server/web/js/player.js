@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { collisionBoxes, ZONE_BOUNDS } from '../../shared/zone.js';
 import { Humanoid3 } from './character/humanoid3.js';
 import { emoteAnimation } from './character/emoteAnimations.js';
-import { VehiclePhysics, VEHICLE_SPECS } from './vehicles.js';
+import { VehiclePhysics, VEHICLE_SPECS, PlanePhysics } from './vehicles.js';
 import { createVehicle } from './vehicles2.js';
 import { CATALOG_BY_ID } from '../../shared/catalog.js';
 
@@ -77,7 +77,7 @@ export class LocalPlayer {
       this.yaw -= dx * 0.0032;
       this.pitch = THREE.MathUtils.clamp(this.pitch + dy * 0.0028, -0.25, 1.2);
     });
-    this.dom.addEventListener('wheel', (e) => { this.camDist = THREE.MathUtils.clamp(this.camDist + e.deltaY * 0.004, 2.2, this.mode === 'vehicle' ? 14 : 9); }, { passive: true });
+    this.dom.addEventListener('wheel', (e) => { this.camDist = THREE.MathUtils.clamp(this.camDist + e.deltaY * 0.004, 2.2, this.mode === 'vehicle' ? (this.vehicle?.kind === 'aviao' ? 22 : 14) : 9); }, { passive: true });
     // toque (telemóvel): arrastar para rodar a câmara
     let tx = 0;
     let ty = 0;
@@ -101,6 +101,9 @@ export class LocalPlayer {
       run: k.has('ShiftLeft') || k.has('ShiftRight'),
       jump: k.has('Space'),
       handbrake: k.has('Space'),
+      // avião: W/S aceleram/desaceleram, ↑/↓ dedicadas ao nariz, ←/→ à inclinação/curva
+      pitchUp: k.has('ArrowUp'),
+      pitchDown: k.has('ArrowDown'),
     };
   }
 
@@ -127,12 +130,14 @@ export class LocalPlayer {
   }
 
   enterVehicle(kind, x, z, heading, color, { id = null, race = false, itemId = null, paint = null, rims = null } = {}) {
-    const item = itemId ?? (kind === 'moto' ? 'moto_ngola' : 'sedan_kianda');
+    const item = itemId ?? (kind === 'moto' ? 'moto_ngola' : kind === 'aviao' ? 'aviao_turismo' : 'sedan_kianda');
     const model = createVehicle(item, { paint: paint ?? color, rims });
     this.scene.add(model.root);
-    const phys = new VehiclePhysics(kind, x, z, heading);
-    const spec = CATALOG_BY_ID.get(item)?.specs;
-    if (spec?.maxSpeed) phys.spec = { ...phys.spec, maxSpeed: spec.maxSpeed, accel: phys.spec.accel * (spec.maxSpeed / phys.spec.maxSpeed) };
+    const phys = kind === 'aviao' ? new PlanePhysics(kind, x, z, heading) : new VehiclePhysics(kind, x, z, heading);
+    if (kind !== 'aviao') {
+      const spec = CATALOG_BY_ID.get(item)?.specs;
+      if (spec?.maxSpeed) phys.spec = { ...phys.spec, maxSpeed: spec.maxSpeed, accel: phys.spec.accel * (spec.maxSpeed / phys.spec.maxSpeed) };
+    }
     this.vehicle = { kind, id, race, color: paint ?? color, itemId: item, paint, model, phys };
     this.stopEmote();
     // animação de entrada: abrir e fechar a porta do condutor (modelos com portas)
@@ -140,7 +145,7 @@ export class LocalPlayer {
     setTimeout(() => model.setDoor?.('L', 0), 650);
     this.mode = 'vehicle';
     this.root.visible = kind === 'moto';
-    this.camDist = 7.5;
+    this.camDist = kind === 'aviao' ? 13 : 7.5;
     this.yaw = heading + Math.PI;
   }
 
@@ -163,7 +168,7 @@ export class LocalPlayer {
     this.mode = 'foot';
     this.root.visible = true;
     this.root.rotation.z = 0;
-    this.pos.set(ex, this.groundHeightAt(ex, ez), ez);
+    this.pos.set(ex, v.phys.y ?? this.groundHeightAt(ex, ez), ez);
     this.heading = v.phys.heading;
     this.camDist = 4.6;
     return { x: v.phys.x, z: v.phys.z, heading: v.phys.heading };
@@ -207,7 +212,20 @@ export class LocalPlayer {
 
   update(dt, dynamic = []) {
     const inp = this.inputEnabled ? this.input() : {};
-    if (this.mode === 'vehicle') {
+    if (this.mode === 'vehicle' && this.vehicle.kind === 'aviao') {
+      const v = this.vehicle;
+      const vin = this.frozen ? {} : inp;
+      v.phys.step(dt, vin, this.groundHeightAt(v.phys.x, v.phys.z));
+      v.phys.x = THREE.MathUtils.clamp(v.phys.x, ZONE_BOUNDS.minX + 2, ZONE_BOUNDS.maxX - 2);
+      v.phys.z = THREE.MathUtils.clamp(v.phys.z, ZONE_BOUNDS.minZ + 2, ZONE_BOUNDS.maxZ - 2);
+      v.model.root.position.set(v.phys.x, v.phys.y, v.phys.z);
+      v.model.root.rotation.y = v.phys.heading;
+      v.model.animate(dt, v.phys.speed, 0, 0, v.phys.pitch, v.phys.roll);
+      this.pos.set(v.phys.x, v.phys.y, v.phys.z);
+      this.heading = v.phys.heading;
+      this.speed = v.phys.speed;
+      this.anim = 'drive';
+    } else if (this.mode === 'vehicle') {
       const v = this.vehicle;
       const vin = this.frozen ? {} : { ...inp };
       if (this.touchDrive) Object.assign(vin, this.touchDrive);

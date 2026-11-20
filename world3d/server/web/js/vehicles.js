@@ -43,6 +43,8 @@ export const VEHICLE_SPECS = {
   taxi: { maxSpeed: 32, accel: 6.5, brake: 13, reverse: 7, wheelbase: 2.9, maxSteer: 0.5, length: 4.8, width: 1.9, radius: 1.1, mass: 1.2 },
   carrinha: { maxSpeed: 30, accel: 5.5, brake: 12, reverse: 6, wheelbase: 3.0, maxSteer: 0.48, length: 5.0, width: 2.0, radius: 1.2, mass: 1.4 },
   moto: { maxSpeed: 42, accel: 9.5, brake: 15, reverse: 3, wheelbase: 1.45, maxSteer: 0.6, length: 2.1, width: 0.8, radius: 0.6, mass: 0.5 },
+  // avião de turismo: maxSpeed = velocidade máxima de voo; climbRate = subida máx. (m/s) a essa velocidade
+  aviao: { maxSpeed: 48, accel: 9, climbRate: 7, liftSpeedFactor: 0.42, turnRate: 1.05 },
 };
 
 export class VehicleModel {
@@ -252,5 +254,63 @@ export class VehiclePhysics {
       }
     }
     return { x, z, impact };
+  }
+}
+
+/**
+ * Física arcade de voo para o avião de turismo: motor (acelerador), nariz
+ * (subir/descer) e inclinação lateral (que também faz a curva — tal como um
+ * avião real), com sustentação dependente da velocidade (sem velocidade
+ * mínima não descola nem sobe).
+ */
+export class PlanePhysics {
+  constructor(kind, x, z, heading) {
+    this.kind = kind;
+    this.spec = VEHICLE_SPECS.aviao;
+    this.x = x;
+    this.y = 0;
+    this.z = z;
+    this.heading = heading;
+    this.speed = 0;
+    this.pitch = 0; // rad, nariz para cima é positivo
+    this.roll = 0; // rad, inclinação lateral
+    this.vSpeed = 0;
+    this.grounded = true;
+  }
+
+  step(dt, input, groundY = 0) {
+    const s = this.spec;
+    const throttle = (input.forward ? 1 : 0) - (input.back ? 1 : 0);
+    this.speed += throttle * s.accel * dt;
+    if (!throttle) this.speed -= Math.sign(this.speed) * 1.2 * dt; // atrito do ar muito leve
+    this.speed = Math.max(0, Math.min(s.maxSpeed, this.speed));
+
+    const pitchTarget = (input.pitchUp ? 1 : 0) - (input.pitchDown ? 1 : 0);
+    this.pitch += (pitchTarget * 0.55 - this.pitch) * Math.min(1, dt * 2.2);
+    this.pitch = Math.max(-0.42, Math.min(0.5, this.pitch));
+
+    const rollTarget = (input.left ? 1 : 0) - (input.right ? 1 : 0);
+    this.roll += (rollTarget * 0.55 - this.roll) * Math.min(1, dt * 3);
+    this.roll = Math.max(-0.6, Math.min(0.6, this.roll));
+    // vira tanto mais depressa quanto mais inclinado e mais rápido (parado no chão, roda muito pouco)
+    this.heading += this.roll * s.turnRate * (0.25 + 0.75 * (this.speed / s.maxSpeed)) * dt;
+
+    const liftSpeed = s.maxSpeed * s.liftSpeedFactor;
+    const liftFactor = Math.max(0, Math.min(1, (this.speed - liftSpeed * 0.6) / (liftSpeed * 0.5)));
+    const climb = Math.sin(this.pitch) * s.climbRate * liftFactor;
+    const stallSink = this.grounded ? 0 : (1 - liftFactor) * 3.2; // sem velocidade, cai
+    this.vSpeed += (climb - stallSink - this.vSpeed) * Math.min(1, dt * 2.5);
+
+    this.y += this.vSpeed * dt;
+    if (this.y <= groundY) {
+      this.y = groundY;
+      if (this.vSpeed < 0) this.vSpeed = 0;
+      this.grounded = true;
+      if (this.speed < liftSpeed) this.pitch *= Math.max(0, 1 - dt * 3); // não levanta o nariz sem velocidade
+    } else this.grounded = false;
+
+    const horiz = this.speed * Math.cos(this.pitch);
+    this.x += Math.sin(this.heading) * horiz * dt;
+    this.z += Math.cos(this.heading) * horiz * dt;
   }
 }

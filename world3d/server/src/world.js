@@ -24,7 +24,7 @@ import { EMOTE_LIMITS } from '../shared/emotes.js';
 import { PROPERTIES_CATALOG } from '../shared/catalog.js';
 
 const POI_NAME = new Map(POIS.map((p) => [p.id, p.name]));
-const MAX_SPEED = { foot: 9.5, car: 62, moto: 66 };
+const MAX_SPEED = { foot: 9.5, car: 62, moto: 66, aviao: 50 };
 const APPEARANCE_KEYS = ['gender', 'skinTone', 'hairStyle', 'hairColor', 'top', 'topColor', 'topPattern', 'bottom', 'bottomColor', 'shoes', 'shoesColor', 'accessory', 'accessories', 'height', 'bodyType', 'face'];
 
 export function sanitizeAppearance(a = {}) {
@@ -366,11 +366,11 @@ export class World {
     }
     p.x = x;
     p.z = z;
-    p.y = Math.max(-1, Math.min(60, Number(m.y) || 0));
+    p.y = Math.max(-1, Math.min(220, Number(m.y) || 0)); // tecto alto o suficiente para o avião de turismo
     p.h = Number(m.h) || 0;
     p.anim = String(m.a ?? 'idle').slice(0, 12);
     p.speed = Math.min(80, Math.abs(Number(m.s) || 0));
-    if (m.veh && ['car', 'moto'].includes(m.veh) && (p.vehicleId || this.races.inCompetition(p.id))) {
+    if (m.veh && ['car', 'moto', 'aviao'].includes(m.veh) && (p.vehicleId || this.races.inCompetition(p.id))) {
       p.vehicle = m.veh;
       p.inVehicle = true;
       p.vehicleColor = String(m.vc ?? '').replace(/[^#\w]/g, '').slice(0, 9) || null;
@@ -726,6 +726,7 @@ export class World {
       talatona: { x: 0, z: 160, h: Math.PI },
       industrial: { x: 170, z: 0, h: 0 },
       marginal: { x: 0, z: -160, h: 0 },
+      airport: { x: 193, z: 129, h: 0 },
     };
     const d = DESTS[place];
     if (!d) return;

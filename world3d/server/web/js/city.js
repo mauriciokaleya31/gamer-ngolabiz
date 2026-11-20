@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import {
-  ROADS, BUILDINGS, PROPS, BENCHES, INTERSECTIONS, TRAFFIC_LIGHTS, PARKED_VEHICLES, RACE_TRACK, ZONE_BOUNDS,
+  ROADS, BUILDINGS, PROPS, BENCHES, INTERSECTIONS, TRAFFIC_LIGHTS, PARKED_VEHICLES, RACE_TRACK, ZONE_BOUNDS, AIRPORT_RUNWAY,
   sidewalkRects, roadRect, interiorWalls, doorPoint, pointInRect,
 } from '../../shared/zone.js';
 import { makeRng } from '../../shared/rng.js';
@@ -159,6 +159,7 @@ export class City {
     this.buildPark();
     this.buildArena();
     this.buildEastSide();
+    this.buildAirport();
     this.buildStreetFurniture();
     this.buildTrees();
     this.buildTrafficLights();
@@ -708,6 +709,36 @@ export class City {
     this.group.add(sign);
     this.signMaterials.push({ mat: sign.material, openHours: [0, 24] });
     this.stationLightPos = new THREE.Vector3(110, 4.5, 30);
+  }
+
+  /** Aeroporto Kianda: pista com marcações e placa de estacionamento (avião). */
+  buildAirport() {
+    const r = AIRPORT_RUNWAY;
+    const runwayM = new THREE.MeshStandardMaterial({ map: asphaltTexture(), roughness: 0.95, metalness: 0, color: 0x6b7076 });
+    this.wetMaterials.push({ mat: runwayM, dryRough: 0.95, wetRough: 0.2, dryColor: new THREE.Color(0xffffff), wetColor: new THREE.Color(0x8a8f96) });
+    const geos = [planeXZ(r.minX, r.maxX, r.minZ, r.maxZ, 0.02, 8), planeXZ(r.apron.minX, r.apron.maxX, r.apron.minZ, r.apron.maxZ, 0.02, 8)];
+    this.add(new THREE.Mesh(mergeGeometries(geos), runwayM));
+
+    // marcações: eixo central tracejado + limiares de pista
+    const white = new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.6 });
+    const cx = (r.minX + r.maxX) / 2;
+    const dash = [];
+    for (let z = r.minZ + 3; z < r.maxZ - 3; z += 9) dash.push([cx, z + 3, 0.5, 5]);
+    dash.push([cx, r.minZ + 2, r.maxX - r.minX - 4, 1.4], [cx, r.maxZ - 2, r.maxX - r.minX - 4, 1.4]);
+    const geo = new THREE.PlaneGeometry(1, 1);
+    geo.rotateX(-Math.PI / 2);
+    const inst = new THREE.InstancedMesh(geo, white, dash.length);
+    const mtx = new THREE.Matrix4();
+    dash.forEach(([x, z, w, d], i) => { mtx.makeScale(w, 1, d); mtx.setPosition(x, 0.045, z); inst.setMatrixAt(i, mtx); });
+    inst.receiveShadow = true;
+    this.group.add(inst);
+
+    // letreiro do aeroporto na fachada do hangar
+    const tex = signTexture('AEROPORTO KIANDA', { bg: '#0f766e' });
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(16, 2), new THREE.MeshStandardMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0 }));
+    sign.position.set(196, 8.4, 150.05);
+    this.group.add(sign);
+    this.signMaterials.push({ mat: sign.material, openHours: [0, 24] });
   }
 
   // ------------------------------------------------------ mobiliário urbano

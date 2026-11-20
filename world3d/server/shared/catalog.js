@@ -70,6 +70,7 @@ export const VEHICLES = [
     license: 'CC-BY 4.0 — Eric Chadwick / Darmstadt Graphics Group (Khronos glTF Sample Assets "CarConcept", a partir de modelo CC0 de "Unity Fan")',
   }),
   V('autocarro', 'Autocarro urbano', 'car', 0, { status: 'indisponivel', active: true }),
+  V('aviao_turismo', 'Avião de Turismo Kianda', 'aviao', 0, { body: 'aviao', specs: { maxSpeed: 48, climbRate: 7 } }),
 ];
 
 export const PAINT_PALETTE = ['#b71c1c', '#0d47a1', '#f5f5f5', '#212121', '#9e9e9e', '#1b5e20', '#f9a825', '#e65100', '#6a1b9a', '#00838f', '#c2185b', '#4e342e'];
