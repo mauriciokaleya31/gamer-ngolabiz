@@ -727,6 +727,7 @@ export class World {
       industrial: { x: 170, z: 0, h: 0 },
       marginal: { x: 0, z: -160, h: 0 },
       airport: { x: 193, z: 129, h: 0 },
+      farm: { x: -192, z: -18, h: Math.PI },
     };
     const d = DESTS[place];
     if (!d) return;

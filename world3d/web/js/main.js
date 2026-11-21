@@ -529,7 +529,7 @@ let sendAcc = 0;
 let mmAcc = 0;
 let fpsAcc = 0;
 let frames = 0;
-window.__w3d = { fps: 0, scene, camera, renderer, get player() { return player; }, get actors() { return actors; }, net, env, quality: QUALITY_PROFILES };
+window.__w3d = { fps: 0, scene, camera, renderer, city, get player() { return player; }, get actors() { return actors; }, net, env, quality: QUALITY_PROFILES };
 
 function loop(now) {
   const dt = Math.min(0.1, (now - last) / 1000);

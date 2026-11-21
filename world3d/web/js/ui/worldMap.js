@@ -305,6 +305,7 @@ export class WorldMapUI {
         centro: '#0284c7',
         parque: '#059669',
         aeroporto: '#0f766e',
+        fazenda: '#65a30d',
       }[b.district] ?? '#334155';
 
       g.fillStyle = fill;

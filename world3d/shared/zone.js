@@ -269,6 +269,9 @@ function generateBuildings() {
   // 5. Aeroporto Kianda (Este, fora do anel de corrida, a leste da Rua do Polo Industrial)
   add(building('hangar_aeroporto', 180, 212, 150, 175, { name: 'Aeroporto Kianda — Hangar & Terminal', type: 'warehouse', district: 'aeroporto', floors: 1, height: 9, face: 'S', color: '#64748b', sign: 'AEROPORTO KIANDA' }));
 
+  // 6. Fazenda Kianda (Oeste, fora do anel de corrida, a oeste da Rua da Maianga)
+  add(building('celeiro_fazenda', -235, -205, -68, -50, { name: 'Fazenda Kianda — Celeiro', type: 'warehouse', district: 'fazenda', floors: 1, height: 7, face: 'E', color: '#8a4a2d', roof: 'gable', sign: 'FAZENDA KIANDA' }));
+
   for (const b of B) {
     if (!b.height) b.height = b.floors * 3.2 + (b.roof === 'gable' ? 0.4 : 0.6);
     b.homeSlots = b.type === 'house' ? 3 : b.type === 'apartment' ? Math.min(12, b.floors * 2) : 0;
@@ -509,6 +512,21 @@ export const AIRPORT_RUNWAY = Object.freeze({
   heading: 0, // rumo Norte (decolagem/aterragem ao longo de Z crescente→decrescente)
   apron: { minX: 180, maxX: 212, minZ: 132, maxZ: 150 },
 });
+
+/**
+ * Fazenda Kianda (Oeste), na faixa livre além da Rua da Maianga (x=-165) —
+ * zona decorativa com animais (vaca, touro, cavalo, burro), fora do grafo
+ * de navegação pedonal, do trânsito e de qualquer colisão de veículos.
+ */
+export const FARM_AREA = Object.freeze({ minX: -235, maxX: -178, minZ: -68, maxZ: -16 });
+export const FARM_ANIMALS = Object.freeze([
+  { id: 'fazenda_vaca_1', kind: 'cow', x: -198, z: -25, heading: 0.4 },
+  { id: 'fazenda_vaca_2', kind: 'cow', x: -190, z: -40, heading: -0.8 },
+  { id: 'fazenda_touro_1', kind: 'bull', x: -182, z: -30, heading: 1.2 },
+  { id: 'fazenda_cavalo_1', kind: 'horse', x: -195, z: -22, heading: -0.3 },
+  { id: 'fazenda_cavalo_2', kind: 'horse', x: -185, z: -42, heading: 2.1 },
+  { id: 'fazenda_burro_1', kind: 'donkey', x: -200, z: -35, heading: 0.9 },
+]);
 
 export const RACE_TRACKS = Object.freeze({
   circuito_anel_kianda: {

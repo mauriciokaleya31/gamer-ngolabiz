@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import {
   ROADS, BUILDINGS, PROPS, BENCHES, INTERSECTIONS, TRAFFIC_LIGHTS, PARKED_VEHICLES, RACE_TRACK, ZONE_BOUNDS, AIRPORT_RUNWAY,
+  FARM_AREA, FARM_ANIMALS,
   sidewalkRects, roadRect, interiorWalls, doorPoint, pointInRect,
 } from '../../shared/zone.js';
 import { makeRng } from '../../shared/rng.js';
@@ -14,6 +15,9 @@ import {
   facadeTextures, shopfrontTexture, houseTexture, signTexture, FACADE_TILE,
 } from './textures.js';
 import { createVehicle } from './vehicles2.js';
+import { GLTFLoader } from '../vendor/three/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from '../vendor/three/libs/meshopt_decoder.module.js';
+import { clone as cloneSkinned } from '../vendor/three/utils/SkeletonUtils.js';
 
 /** Uniformes globais das janelas (actualizados pelo ambiente a cada frame). */
 export const WINDOW_UNIFORMS = {
@@ -149,6 +153,7 @@ export class City {
     this.signMaterials = [];
     this.wetMaterials = [];
     this.animated = [];
+    this.animalMixers = [];
     this.parked = new Map();
     this.sidewalks = sidewalkRects();
     this.buildGround();
@@ -160,6 +165,7 @@ export class City {
     this.buildArena();
     this.buildEastSide();
     this.buildAirport();
+    this.buildFarm();
     this.buildStreetFurniture();
     this.buildTrees();
     this.buildTrafficLights();
@@ -741,6 +747,81 @@ export class City {
     this.signMaterials.push({ mat: sign.material, openHours: [0, 24] });
   }
 
+  /** Fazenda Kianda: pasto vedado com vaca, touro, cavalo e burro (modelos .glb CC0, animados). */
+  buildFarm() {
+    const a = FARM_AREA;
+    const pasture = new THREE.Mesh(planeXZ(a.minX, a.maxX, a.minZ, a.maxZ, 0.015, 10), new THREE.MeshStandardMaterial({ map: grassTexture(), roughness: 1 }));
+    this.add(pasture);
+
+    // vedação de madeira: postes + 2 travessas, à volta do perímetro
+    const postM = new THREE.MeshStandardMaterial({ color: 0x5a3a24, roughness: 0.9 });
+    const postGeo = new THREE.CylinderGeometry(0.1, 0.12, 1.3, 8);
+    const railGeo = new THREE.BoxGeometry(1, 0.08, 0.06);
+    const posts = [];
+    const rails = [];
+    const perim = [];
+    const step = 3;
+    for (let x = a.minX; x <= a.maxX; x += step) { perim.push([x, a.minZ]); perim.push([x, a.maxZ]); }
+    for (let z = a.minZ + step; z < a.maxZ; z += step) { perim.push([a.minX, z]); perim.push([a.maxX, z]); }
+    for (const [x, z] of perim) { const m = new THREE.Matrix4().setPosition(x, 0.65, z); posts.push(m); }
+    for (let x = a.minX; x < a.maxX; x += step) {
+      for (const z of [a.minZ, a.maxZ]) for (const y of [0.4, 0.85]) { const m = new THREE.Matrix4(); m.makeScale(step, 1, 1); m.setPosition(x + step / 2, y, z); rails.push(m); }
+    }
+    for (let z = a.minZ; z < a.maxZ; z += step) {
+      for (const x of [a.minX, a.maxX]) for (const y of [0.4, 0.85]) { const m = new THREE.Matrix4(); m.makeScale(step, 1, 1); m.setPosition(x, y, z + step / 2); m.multiply(new THREE.Matrix4().makeRotationY(Math.PI / 2)); rails.push(m); }
+    }
+    const postInst = new THREE.InstancedMesh(postGeo, postM, posts.length);
+    posts.forEach((m, i) => postInst.setMatrixAt(i, m));
+    postInst.castShadow = true;
+    this.group.add(postInst);
+    const railInst = new THREE.InstancedMesh(railGeo, postM, rails.length);
+    rails.forEach((m, i) => railInst.setMatrixAt(i, m));
+    this.group.add(railInst);
+
+    // animais: modelos .glb originais (CC0, Quaternius), com esqueleto/animação.
+    //
+    // LIMITAÇÃO CONHECIDA (por resolver): os modelos carregam correctamente
+    // (confirmado — posição, escala e malha certas, sem erros de rede nem de
+    // consola), mas não chegam a aparecer no ecrã. Já eliminámos como causa:
+    // a escala (corrigida dinamicamente pela caixa delimitadora), a clonagem
+    // de SkinnedMesh (usa SkeletonUtils.clone, não Object3D.clone), o corte
+    // por frustum (desligado explicitamente) e a própria animação (continua
+    // invisível mesmo sem nenhum AnimationMixer a tocar). A causa mais
+    // provável é uma incompatibilidade entre a escala embutida nestes
+    // modelos (ossos a ~100x) e o cálculo de pele (skinning) do three.js
+    // nesta versão — precisa de mais investigação, por isso o carregamento
+    // fica desligado para não gastar rede em vão em ficheiros que não se
+    // veem. A vedação, o pasto e o celeiro já funcionam e ficam activos.
+    const ANIMALS_ENABLED = false;
+    if (ANIMALS_ENABLED) {
+      const loader = new GLTFLoader();
+      loader.setMeshoptDecoder(MeshoptDecoder);
+      const cache = new Map();
+      const loadAnimal = (kind) => {
+        if (!cache.has(kind)) cache.set(kind, loader.loadAsync(new URL(`../assets/animals/${kind}.glb`, import.meta.url).href));
+        return cache.get(kind);
+      };
+      const TARGET_HEIGHT = { cow: 1.45, bull: 1.5, horse: 1.6, donkey: 1.25 };
+      for (const an of FARM_ANIMALS) {
+        loadAnimal(an.kind).then((gltf) => {
+          const inst = cloneSkinned(gltf.scene);
+          const box = new THREE.Box3().setFromObject(inst);
+          const h = box.max.y - box.min.y;
+          const scale = h > 0 ? (TARGET_HEIGHT[an.kind] ?? 1.4) / h : 1;
+          inst.scale.setScalar(scale);
+          inst.position.set(an.x, -box.min.y * scale, an.z);
+          inst.rotation.y = an.heading;
+          inst.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+          this.group.add(inst);
+          const mixer = new THREE.AnimationMixer(inst);
+          const clip = gltf.animations.find((c) => c.name === 'Eating') ?? gltf.animations.find((c) => c.name === 'Idle');
+          if (clip) mixer.clipAction(clip).play();
+          this.animalMixers.push(mixer);
+        }).catch((e) => console.warn(`Animal "${an.kind}" indisponível`, e));
+      }
+    }
+  }
+
   // ------------------------------------------------------ mobiliário urbano
   buildStreetFurniture() {
     const lamps = PROPS.filter((p) => p.kind === 'streetlight');
@@ -964,6 +1045,7 @@ export class City {
 
   /** Actualizações por frame (água, letreiros, molhado, luzes). */
   update(dt, env) {
+    for (const m of this.animalMixers) m.update(dt);
     const t = performance.now() / 1000;
     WIND.uTime.value = t;
     WIND.uWind.value = env.weather?.wind ?? 0.2;
