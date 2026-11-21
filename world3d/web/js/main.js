@@ -149,12 +149,10 @@ fetch(healthUrl).then((r) => r.json()).then((h) => {
   $('cr-status').textContent = h.status === 'active' ? `Servidor do mundo online · ${h.players} jogador(es) em Kianda Centro` : 'Zona em manutenção.';
 }).catch(() => { $('cr-status').textContent = 'A aguardar o servidor do mundo…'; });
 
-$('cr-enter').onclick = async () => {
+async function enterWorld(appearance, guestName) {
   const btn = $('cr-enter');
   btn.disabled = true;
   $('cr-status').textContent = 'A entrar…';
-  const appearance = { ...creator.a };
-  const guestName = $('cr-name').value.trim();
   try {
     localStorage.setItem('w3d_appearance', JSON.stringify(appearance));
     localStorage.setItem('w3d_name', guestName);
@@ -167,7 +165,23 @@ $('cr-enter').onclick = async () => {
     $('cr-status').textContent = `Erro: ${e.message}`;
     btn.disabled = false;
   }
-};
+}
+
+$('cr-enter').onclick = () => enterWorld({ ...creator.a }, $('cr-name').value.trim());
+
+// Entrar automaticamente se já tiveres estado aqui antes (nome guardado): evita
+// ter de clicar "ENTRAR" outra vez sempre que a página é actualizada/recarregada.
+// Cancela sozinho se clicares em qualquer coisa no criador antes de entrar.
+if (saved && (localStorage.getItem('w3d_name') ?? '').trim()) {
+  let cancelled = false;
+  $('creator').addEventListener('pointerdown', () => { cancelled = true; }, { once: true, capture: true });
+  setTimeout(() => {
+    if (!cancelled && !player) {
+      $('cr-status').textContent = 'A voltar a entrar automaticamente…';
+      enterWorld(saved, localStorage.getItem('w3d_name').trim());
+    }
+  }, 900);
+}
 
 function openAppearanceEditor() {
   hud.toggleMenu(false);
