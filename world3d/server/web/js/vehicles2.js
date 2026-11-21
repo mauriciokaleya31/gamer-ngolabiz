@@ -422,6 +422,70 @@ class GTCar {
   }
 }
 
+// ------------------------------------------------------------ Veículo glTF genérico
+/**
+ * Carrega qualquer modelo .glb licenciado livremente, sem assumir nomes de
+ * ossos/nós específicos (ao contrário do GTCar, feito à medida do Kianda GT):
+ * centra-o, pousa-o no chão e, se o próprio ficheiro trouxer uma animação
+ * (ex.: rotação das rodas, comum em exportações do Blender), toca-a a uma
+ * velocidade proporcional à do veículo. Serve para integrar modelos de
+ * bibliotecas como os Khronos glTF Sample Assets sem trabalho de preparação
+ * manual por modelo.
+ */
+const glbCache = new Map();
+function loadGenericGLB(url, { yaw = 0 } = {}) {
+  if (!glbCache.has(url)) {
+    const loader = new GLTFLoader();
+    loader.setMeshoptDecoder(MeshoptDecoder);
+    glbCache.set(url, loader.loadAsync(new URL(`../${url}`, import.meta.url).href).then((gltf) => {
+      const scene = gltf.scene;
+      scene.updateMatrixWorld(true);
+      const wrap = new THREE.Group();
+      wrap.add(scene);
+      wrap.rotation.y = yaw;
+      wrap.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(wrap);
+      scene.position.x -= (box.min.x + box.max.x) / 2;
+      scene.position.z -= (box.min.z + box.max.z) / 2;
+      scene.position.y -= box.min.y;
+      scene.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      return { gltf, template: wrap };
+    }));
+  }
+  return glbCache.get(url);
+}
+
+class GenericGLBVehicle {
+  constructor(itemId, item) {
+    this.kind = item.vehicleClass === 'moto' ? 'moto' : 'car';
+    this.itemId = itemId;
+    this.root = new THREE.Group();
+    this.loaded = false;
+    this.placeholder = new ProceduralCar(itemId, 'van', { paint: item.paints?.[0] ?? '#dfe3e6' });
+    this.root.add(this.placeholder.root);
+    this.head = lamp(0xfff4d6);
+    this.tail = lamp(0xff1a1a, 0.15);
+    loadGenericGLB(item.asset, { yaw: item.yaw ?? 0 }).then(({ gltf, template }) => {
+      const inst = template.clone(true);
+      this.mixer = new THREE.AnimationMixer(inst);
+      this.action = gltf.animations?.[0] ? this.mixer.clipAction(gltf.animations[0]) : null;
+      this.action?.play();
+      this.root.remove(this.placeholder.root);
+      this.root.add(inst);
+      this.model = inst;
+      this.loaded = true;
+    }).catch((e) => console.warn(`Modelo glTF "${item.asset}" indisponível, a usar substituto`, e));
+  }
+
+  setLights() {}
+  setDoor() {}
+
+  animate(dt, speed = 0) {
+    if (!this.loaded) { this.placeholder.animate(dt, speed); return; }
+    if (this.action) { this.action.timeScale = speed / 6; this.mixer.update(dt); }
+  }
+}
+
 // ------------------------------------------------------------ Avião de turismo (procedural)
 /**
  * Monomotor ligeiro simples: fuselagem afunilada, asa alta, estabilizadores,
@@ -493,7 +557,8 @@ class ProceduralPlane {
 export function createVehicle(itemId, { paint = null, rims = null } = {}) {
   const item = CATALOG_BY_ID.get(itemId);
   if (!item) return new ProceduralCar(itemId, 'sedan', { paint: paint ?? PAINT_PALETTE[0] });
-  if (item.model === 'glb') return new GTCar(itemId, item, { paint: paint ?? item.paints[0] });
+  if (item.model === 'glb' && item.asset?.includes('kianda_gt')) return new GTCar(itemId, item, { paint: paint ?? item.paints[0] });
+  if (item.model === 'glb') return new GenericGLBVehicle(itemId, item);
   if (item.vehicleClass === 'aviao') return new ProceduralPlane(itemId, { paint });
   if (item.vehicleClass === 'moto') return new ProceduralMoto(itemId, { paint, livery: item.livery });
   return new ProceduralCar(itemId, item.body, { paint: paint ?? PAINT_PALETTE[0], rims: rims ?? 'classica', livery: item.livery });

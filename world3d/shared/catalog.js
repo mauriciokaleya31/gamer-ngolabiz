@@ -71,6 +71,12 @@ export const VEHICLES = [
   }),
   V('autocarro', 'Autocarro urbano', 'car', 0, { status: 'indisponivel', active: true }),
   V('aviao_turismo', 'Avião de Turismo Kianda', 'aviao', 0, { body: 'aviao', specs: { maxSpeed: 48, climbRate: 7 } }),
+  V('carrinha_vintage', 'Carrinha de Entregas Vintage', 'car', 15000, {
+    status: 'pronto', model: 'glb', asset: 'assets/vehicles/cesium_milk_truck.glb', body: 'van', yaw: 0,
+    paints: ['Original'], rims: ['original'],
+    specs: { maxSpeed: 29 },
+    license: 'CC-BY 4.0 — © 2017 Cesium, Khronos glTF Sample Assets ("Cesium Milk Truck")',
+  }),
 ];
 
 export const PAINT_PALETTE = ['#b71c1c', '#0d47a1', '#f5f5f5', '#212121', '#9e9e9e', '#1b5e20', '#f9a825', '#e65100', '#6a1b9a', '#00838f', '#c2185b', '#4e342e'];
